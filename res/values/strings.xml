@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">M-Fixer</string>
+    <string name="welcome">Welcome to M-Fixer</string>
+    <string name="dev_name">Developer: MohFahmi</string>
+    <string name="team_name">ScarilyID Team</string>
+    <string name="access_button">Grant Minecraft Access</string>
+    <string name="create_skin">Create Skin Pack</string>
+    <string name="settings">Settings</string>
+    <string name="lang_select">Select Language</string>
+</resources>
