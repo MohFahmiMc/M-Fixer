@@ -64,7 +64,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="15dp"
-        android:text="⚙️ Application Settings"
+        android:text="Application Settings"
         android:textColor="#BBBBBB"
         android:gravity="center"
         app:layout_constraintBottom_toBottomOf="parent" />
