@@ -27,7 +27,7 @@
             android:layout_height="55dp"
             android:layout_marginTop="15dp"
             android:backgroundTint="#4CAF50"
-            android:text="RE-SCAN MINECRAFT FOLDER"
+            android:text="GRANT MINECRAFT ACCESS"
             app:cornerRadius="10dp" />
     </LinearLayout>
 
