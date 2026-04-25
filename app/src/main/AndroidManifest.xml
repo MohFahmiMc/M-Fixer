@@ -4,18 +4,15 @@
 
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" 
-        tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
 
     <application
         android:allowBackup="true"
         android:icon="@drawable/logo"
-        android:label="M-Fixer"
+        android:label="M-Fixer Pro"
         android:roundIcon="@drawable/logo"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.DayNight.DarkActionBar">
-        
-        <activity
+        android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"> <activity
             android:name=".SplashActivity"
             android:exported="true">
             <intent-filter>
@@ -24,10 +21,8 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="false" />
+        <activity android:name=".MainActivity" android:exported="false" />
+        <activity android:name=".SettingsActivity" android:exported="false" />
             
     </application>
-
 </manifest>
