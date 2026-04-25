@@ -21,12 +21,11 @@ class MainActivity : AppCompatActivity() {
         val btnSettings = findViewById<TextView>(R.id.btnSettings)
         val cardAccess = findViewById<CardView>(R.id.cardAccess)
 
-        // Animasi halus saat aplikasi dibuka
+        // Animasi masuk
         val animSlide = AnimationUtils.loadAnimation(this, android.R.anim.slide_in_left)
-        cardAccess.startAnimation(animSlide)
+        cardAccess?.startAnimation(animSlide)
 
         btnAccess.setOnClickListener {
-            // Animasi klik bounce
             it.animate().scaleX(0.9f).scaleY(0.9f).setDuration(100).withEndAction {
                 it.animate().scaleX(1f).scaleY(1f).start()
                 openMinecraftDirectory()
@@ -36,7 +35,6 @@ class MainActivity : AppCompatActivity() {
         btnSettings.setOnClickListener {
             val intent = Intent(this, SettingsActivity::class.java)
             startActivity(intent)
-            // Animasi transisi geser
             overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
         }
     }
