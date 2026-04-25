@@ -17,7 +17,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rvFiles: RecyclerView
     private var currentTreeUri: Uri? = null
     private val PREFS_NAME = "M_FIXER_PREFS"
-    private val KEY_URI = "saved_uri"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,12 +25,15 @@ class MainActivity : AppCompatActivity() {
         rvFiles = findViewById(R.id.rvFiles)
         rvFiles.layoutManager = LinearLayoutManager(this)
 
+        // Tutorial Otomatis dalam Bahasa Inggris
+        checkFirstRun()
+
         val btnAccess = findViewById<Button>(R.id.btnAccess)
         val fabAdd = findViewById<FloatingActionButton>(R.id.fabAdd)
         val btnSettings = findViewById<TextView>(R.id.btnSettings)
 
-        // Muat data otomatis
-        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(KEY_URI, null)?.let {
+        // Load data permanen agar folder tidak hilang saat aplikasi ditutup
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString("saved_uri", null)?.let {
             currentTreeUri = Uri.parse(it)
             loadFiles(currentTreeUri!!)
         }
@@ -44,10 +46,23 @@ class MainActivity : AppCompatActivity() {
 
         fabAdd.setOnClickListener {
             if (currentTreeUri == null) {
-                Toast.makeText(this, "Grant Access Dulu!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Please grant access first!", Toast.LENGTH_SHORT).show()
             } else {
                 createNewFile()
             }
+        }
+    }
+
+    private fun checkFirstRun() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        if (prefs.getBoolean("first_run_v110", true)) {
+            AlertDialog.Builder(this)
+                .setTitle("Quick Tutorial")
+                .setMessage("1. Tap 'GRANT ACCESS' and select the Minecraft folder.\n2. Long press any file to Rename, Delete, or Share.\n3. Use the '+' button to add new files.")
+                .setPositiveButton("Start") { d, _ -> d.dismiss() }
+                .setCancelable(false)
+                .show()
+            prefs.edit().putBoolean("first_run_v110", false).apply()
         }
     }
 
@@ -66,7 +81,7 @@ class MainActivity : AppCompatActivity() {
             data?.data?.let { uri ->
                 contentResolver.takePersistableUriPermission(uri, 
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putString(KEY_URI, uri.toString()).apply()
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putString("saved_uri", uri.toString()).apply()
                 currentTreeUri = uri
                 loadFiles(uri)
             }
@@ -86,16 +101,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun createNewFile() {
-        val input = EditText(this).apply { hint = "nama_file.txt" }
-        AlertDialog.Builder(this).setTitle("Buat File Baru").setView(input)
-            .setPositiveButton("Buat") { _, _ ->
-                val root = DocumentFile.fromTreeUri(this, currentTreeUri!!)
-                root?.createFile("text/plain", input.text.toString())
-                loadFiles(currentTreeUri!!)
-            }.show()
-    }
-
     private fun showFileMenu(file: DocumentFile) {
         val options = arrayOf("Rename", "Delete", "Share")
         AlertDialog.Builder(this).setTitle(file.name).setItems(options) { _, which ->
@@ -110,6 +115,7 @@ class MainActivity : AppCompatActivity() {
                 1 -> {
                     file.delete()
                     loadFiles(currentTreeUri!!)
+                    Toast.makeText(this, "File deleted", Toast.LENGTH_SHORT).show()
                 }
                 2 -> {
                     val intent = Intent(Intent.ACTION_SEND).apply {
@@ -121,6 +127,16 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }.show()
+    }
+
+    private fun createNewFile() {
+        val input = EditText(this).apply { hint = "new_file.txt" }
+        AlertDialog.Builder(this).setTitle("Create New File").setView(input)
+            .setPositiveButton("Create") { _, _ ->
+                val root = DocumentFile.fromTreeUri(this, currentTreeUri!!)
+                root?.createFile("text/plain", input.text.toString())
+                loadFiles(currentTreeUri!!)
+            }.show()
     }
 
     class FileAdapter(private val files: List<DocumentFile>, val onLongClick: (DocumentFile) -> Unit) : 
