@@ -31,7 +31,7 @@ class MainActivity : AppCompatActivity() {
         val btnAccess = findViewById<Button>(R.id.btnAccess)
         val btnSettings = findViewById<TextView>(R.id.btnSettings)
 
-        // CEK DATA TERSIMPAN: Biar tidak perlu klik Grant lagi
+        // CEK DATA TERSIMPAN
         val savedUriString = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(KEY_URI, null)
         if (savedUriString != null) {
             loadFiles(Uri.parse(savedUriString))
@@ -60,12 +60,8 @@ class MainActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 100 && resultCode == RESULT_OK) {
             data?.data?.let { uri ->
-                // IZIN PERMANEN
                 contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                
-                // SIMPAN URI
                 getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putString(KEY_URI, uri.toString()).apply()
-                
                 loadFiles(uri)
             }
         }
@@ -74,23 +70,21 @@ class MainActivity : AppCompatActivity() {
     private fun loadFiles(uri: Uri) {
         val root = DocumentFile.fromTreeUri(this, uri)
         val fileList = root?.listFiles()?.map { it.name ?: "Unknown" } ?: listOf()
-        
         rvFiles.adapter = FileAdapter(fileList)
-        // Animasi List
         val controller = AnimationUtils.loadLayoutAnimation(this, android.R.anim.slide_in_left)
         rvFiles.layoutAnimation = controller
         rvFiles.scheduleLayoutAnimation()
     }
 
-    // ADAPTER UNTUK LIST FILE
     class FileAdapter(private val files: List<String>) : RecyclerView.Adapter<FileAdapter.ViewHolder>() {
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-            val tvName: TextView = view.findViewById(R.id.tvFileName)
+            val tvName: TextView = view.findViewById(android.R.id.text1)
         }
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = 
-            ViewHolder(LayoutInflater.from(parent.context).inflate(R.layout.item_file, parent, false))
+            ViewHolder(LayoutInflater.from(parent.context).inflate(android.R.layout.simple_list_item_1, parent, false))
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            holder.tvName.text = files[position]
+            holder.tvName.text = "📁 " + files[position]
+            holder.tvName.setTextColor(0xFFFFFFFF.toInt())
         }
         override fun getItemCount() = files.size
     }
