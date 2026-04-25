@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">M-Fixer</string>
+    <string name="welcome">Selamat Datang di M-Fixer</string>
+    <string name="dev_name">Pembuat: MohFahmi</string>
+    <string name="team_name">Tim ScarilyID</string>
+    <string name="access_button">Beri Akses Minecraft</string>
+    <string name="create_skin">Buat Skin Pack</string>
+    <string name="settings">Pengaturan</string>
+    <string name="lang_select">Pilih Bahasa</string>
+</resources>
