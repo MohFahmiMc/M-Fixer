@@ -9,14 +9,11 @@
 
     <application
         android:allowBackup="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
         android:icon="@drawable/logo"
         android:label="M-Fixer"
         android:roundIcon="@drawable/logo"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.DayNight.DarkActionBar"
-        tools:targetApi="31">
+        android:theme="@style/Theme.AppCompat.DayNight.DarkActionBar">
         
         <activity
             android:name=".SplashActivity"
@@ -34,4 +31,3 @@
     </application>
 
 </manifest>
-          
