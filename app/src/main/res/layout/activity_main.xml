@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#121212">
@@ -8,25 +9,48 @@
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#1A1A1A">
+        android:background="#1A1A1A"
+        app:elevation="0dp">
+
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:title="M-Fixer"
-            app:titleTextColor="#FFFFFF" />
+            app:title="M-Fixer Pro"
+            app:titleTextColor="#FF9800"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Dark" />
+
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="#000000"
-            android:padding="10dp"
+            android:paddingHorizontal="15dp"
+            android:paddingVertical="8dp"
             android:scrollbars="none">
-            <TextView
-                android:id="@+id/tvPath"
+
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#4CAF50"
-                android:textSize="12sp" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_marginEnd="5dp"
+                    android:src="@android:drawable/ic_menu_save"
+                    app:tint="#4CAF50" />
+
+                <TextView
+                    android:id="@+id/tvPath"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="/storage/emulated/0"
+                    android:textColor="#4CAF50"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    tools:ignore="SmallSp" />
+            </LinearLayout>
         </HorizontalScrollView>
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -34,6 +58,8 @@
         android:id="@+id/rvFiles"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="80dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -43,7 +69,9 @@
         android:layout_gravity="bottom|end"
         android:layout_margin="24dp"
         android:src="@android:drawable/ic_input_add"
-        app:backgroundTint="#4CAF50"
-        app:tint="#000000" />
+        app:backgroundTint="#FF9800"
+        app:elevation="6dp"
+        app:fabSize="normal"
+        app:tint="#121212" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
