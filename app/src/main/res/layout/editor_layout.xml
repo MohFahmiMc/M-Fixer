@@ -8,20 +8,20 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="10dp"
-        android:orientation="horizontal">
-        <Button android:id="@+id/btnUndo" android:layout_width="wrap_content" android:layout_height="40dp" android:text="Undo" android:textSize="10sp" android:backgroundTint="#333"/>
-        <Button android:id="@+id/btnRedo" android:layout_width="wrap_content" android:layout_height="40dp" android:text="Redo" android:textSize="10sp" android:layout_marginStart="8dp" android:backgroundTint="#333"/>
+        android:orientation="horizontal"
+        android:layout_marginBottom="10dp">
+        <Button android:id="@+id/btnUndo" android:layout_width="wrap_content" android:layout_height="40dp" android:text="Undo" android:backgroundTint="#333"/>
+        <Button android:id="@+id/btnRedo" android:layout_width="wrap_content" android:layout_height="40dp" android:text="Redo" android:layout_marginStart="10dp" android:backgroundTint="#333"/>
     </LinearLayout>
     <EditText
         android:id="@+id/etCode"
         android:layout_width="match_parent"
-        android:layout_height="400dp"
+        android:layout_height="match_parent"
         android:background="#000"
         android:gravity="top"
-        android:padding="12dp"
         android:textColor="#00FF00"
         android:fontFamily="monospace"
-        android:hint="Start coding..."
+        android:padding="12dp"
+        android:hint="Start scripting..."
         android:textColorHint="#444"/>
 </LinearLayout>
