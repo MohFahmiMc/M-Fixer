@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.documentfile.provider.DocumentFile
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
@@ -30,6 +31,15 @@ class MainActivity : AppCompatActivity() {
         tvPath = findViewById(R.id.tvPath)
         rvFiles.layoutManager = LinearLayoutManager(this)
 
+        // --- PANGGILAN TOMBOL TAMBAH (+) ---
+        val fabAdd = findViewById<FloatingActionButton>(R.id.fabAdd)
+        fabAdd.setOnClickListener {
+            // Memanggil AddActionHelper yang sudah dipisahkan tadi
+            AddActionHelper.showAddMenu(this, currentDir) {
+                refreshList() // Callback untuk refresh list saat folder baru dibuat
+            }
+        }
+
         checkFirstRun()
     }
 
@@ -46,8 +56,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPermissionPopup() {
+        // Fix untuk error "Ambiguity" dan ID btnContinue yang tadi
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_permission, null)
-        val dialog = AlertDialog.Builder(this).setView(view).setCancelable(false).create()
+        val dialog = AlertDialog.Builder(this)
+            .setView(view)
+            .setCancelable(false)
+            .create()
         
         view.findViewById<Button>(R.id.btnContinue).setOnClickListener {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), REQ_STORAGE)
@@ -75,7 +89,7 @@ class MainActivity : AppCompatActivity() {
         val files = dir.listFiles().sortedWith(compareByDescending<DocumentFile> { it.isDirectory }.thenBy { it.name?.lowercase() })
 
         rvFiles.adapter = FileAdapter(files, folderStack.isNotEmpty()) { selected ->
-            if (selected == null) { // Klik tombol ".."
+            if (selected == null) { 
                 currentDir = folderStack.pop()
             } else if (selected.isDirectory) {
                 folderStack.push(currentDir)
