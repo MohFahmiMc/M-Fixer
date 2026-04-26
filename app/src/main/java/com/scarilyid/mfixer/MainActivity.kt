@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.widget.Button
 import android.widget.TextView
@@ -34,9 +36,8 @@ class MainActivity : AppCompatActivity() {
         // --- PANGGILAN TOMBOL TAMBAH (+) ---
         val fabAdd = findViewById<FloatingActionButton>(R.id.fabAdd)
         fabAdd.setOnClickListener {
-            // Memanggil AddActionHelper yang sudah dipisahkan tadi
             AddActionHelper.showAddMenu(this, currentDir) {
-                refreshList() // Callback untuk refresh list saat folder baru dibuat
+                refreshList() 
             }
         }
 
@@ -56,7 +57,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPermissionPopup() {
-        // Fix untuk error "Ambiguity" dan ID btnContinue yang tadi
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_permission, null)
         val dialog = AlertDialog.Builder(this)
             .setView(view)
@@ -85,20 +85,36 @@ class MainActivity : AppCompatActivity() {
 
     fun refreshList() {
         val dir = currentDir ?: return
-        tvPath.text = dir.uri.path?.substringAfterLast(":") ?: "Memory"
-        val files = dir.listFiles().sortedWith(compareByDescending<DocumentFile> { it.isDirectory }.thenBy { it.name?.lowercase() })
 
-        rvFiles.adapter = FileAdapter(files, folderStack.isNotEmpty()) { selected ->
-            if (selected == null) { 
-                currentDir = folderStack.pop()
-            } else if (selected.isDirectory) {
-                folderStack.push(currentDir)
-                currentDir = selected
-            } else {
-                ActionHelper.showZMenu(this, selected) { refreshList() }
+        // --- PANGGILAN LOADING START ---
+        LoadingHelper.show(this)
+
+        tvPath.text = dir.uri.path?.substringAfterLast(":") ?: "Memory"
+
+        // Jalankan di background sebentar biar loading gak cuma kedip
+        Handler(Looper.getMainLooper()).postDelayed({
+            val files = dir.listFiles().sortedWith(
+                compareByDescending<DocumentFile> { it.isDirectory }
+                .thenBy { it.name?.lowercase() }
+            )
+
+            rvFiles.adapter = FileAdapter(files, folderStack.isNotEmpty()) { selected ->
+                if (selected == null) { 
+                    currentDir = folderStack.pop()
+                    refreshList()
+                } else if (selected.isDirectory) {
+                    folderStack.push(currentDir)
+                    currentDir = selected
+                    refreshList()
+                } else {
+                    ActionHelper.showZMenu(this, selected) { refreshList() }
+                }
             }
-            refreshList()
-        }
+
+            // --- PANGGILAN LOADING DISMISS ---
+            LoadingHelper.dismiss()
+            
+        }, 300) // Delay 300ms agar transisi folder terasa mulus
     }
 
     override fun onBackPressed() {
