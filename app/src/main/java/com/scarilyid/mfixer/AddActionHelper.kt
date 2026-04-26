@@ -1,6 +1,7 @@
 package com.scarilyid.mfixer
 
-import android.content.Context
+import android.app.Activity
+import android.content.Intent
 import android.view.LayoutInflater
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
@@ -9,50 +10,61 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 
 object AddActionHelper {
 
-    fun showAddMenu(context: Context, currentDir: DocumentFile?, onRefresh: () -> Unit) {
-        val dialog = BottomSheetDialog(context)
-        val view = LayoutInflater.from(context).inflate(R.layout.dialog_add_actions, null)
+    // Gunakan Activity, bukan Context, biar bisa panggil startActivityForResult
+    fun showAddMenu(activity: Activity, currentDir: DocumentFile?, onRefresh: () -> Unit) {
+        val dialog = BottomSheetDialog(activity)
+        val view = LayoutInflater.from(activity).inflate(R.layout.dialog_add_actions, null)
 
-        // Tombol Buat Folder Baru
+        // 1. Tombol Buat Folder Baru
         view.findViewById<LinearLayout>(R.id.btnNewFolder).setOnClickListener {
-            showCreateFolderDialog(context, currentDir, onRefresh)
+            showCreateFolderDialog(activity, currentDir, onRefresh)
             dialog.dismiss()
         }
 
-        // Tombol Tambah/Upload File
+        // 2. Tombol Upload File (SEKARANG SUDAH AKTIF)
         view.findViewById<LinearLayout>(R.id.btnNewFile).setOnClickListener {
-            Toast.makeText(context, "Fitur upload segera hadir", Toast.LENGTH_SHORT).show()
             dialog.dismiss()
+            
+            // Intent untuk buka File Manager atau ZArchiver
+            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                type = "*/*" // Pilih semua jenis file
+                addCategory(Intent.CATEGORY_OPENABLE)
+            }
+            
+            // Panggil Picker dengan Request Code 102
+            // Ini akan ditangkap oleh onActivityResult di MainActivity.kt
+            activity.startActivityForResult(Intent.createChooser(intent, "Pilih File"), 102)
         }
 
         dialog.setContentView(view)
         dialog.show()
     }
 
-    private fun showCreateFolderDialog(context: Context, currentDir: DocumentFile?, onRefresh: () -> Unit) {
-        val input = EditText(context)
+    private fun showCreateFolderDialog(activity: Activity, currentDir: DocumentFile?, onRefresh: () -> Unit) {
+        val input = EditText(activity)
         input.setHint("Nama folder")
-        val padding = (20 * context.resources.displayMetrics.density).toInt()
+        val padding = (20 * activity.resources.displayMetrics.density).toInt()
         
-        val container = FrameLayout(context)
-        input.layoutParams = FrameLayout.LayoutParams(
+        val container = FrameLayout(activity)
+        val params = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
-        ).apply { setMargins(padding, 10, padding, 10) }
+        ).apply { setMargins(padding, 20, padding, 20) }
+        input.layoutParams = params
         container.addView(input)
 
-        AlertDialog.Builder(context)
-            .setTitle("Folder Baru")
+        AlertDialog.Builder(activity)
+            .setTitle("Buat Folder Baru")
             .setView(container)
             .setPositiveButton("Buat") { _, _ ->
-                val name = input.text.toString()
+                val name = input.text.toString().trim()
                 if (name.isNotEmpty()) {
                     val newFolder = currentDir?.createDirectory(name)
                     if (newFolder != null) {
                         onRefresh()
-                        Toast.makeText(context, "Folder dibuat", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(activity, "Folder '$name' berhasil dibuat", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(context, "Gagal membuat folder", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(activity, "Gagal membuat folder. Pastikan izin diberikan.", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
