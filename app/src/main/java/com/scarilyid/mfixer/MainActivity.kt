@@ -11,6 +11,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
@@ -26,17 +27,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvPath: TextView
     private var currentDir: DocumentFile? = null
     private val folderStack = Stack<DocumentFile>()
-    private val REQ_STORAGE = 101
+    private val REQ_STORAGE = 101 // Izin Folder Minecraft
+    private val REQ_UPLOAD = 102  // Pilih File (Upload)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // 1. Load Bahasa sebelum setContentView
+        // 1. Load Bahasa sebelum tampilkan UI
         loadLocale()
         
         setContentView(R.layout.activity_main)
 
-        // --- SETUP TOOLBAR ---
+        // --- SETUP TOOLBAR (Titik 3 Fix) ---
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.title = "M-Fixer Pro"
@@ -48,7 +50,9 @@ class MainActivity : AppCompatActivity() {
         // --- TOMBOL TAMBAH (+) ---
         val fabAdd = findViewById<FloatingActionButton>(R.id.fabAdd)
         fabAdd.setOnClickListener {
+            // Memanggil helper menu tambah yang sekarang sudah mengarahkan ke Picker File
             AddActionHelper.showAddMenu(this, currentDir) {
+                // Callback jika butuh refresh
                 refreshList() 
             }
         }
@@ -56,12 +60,11 @@ class MainActivity : AppCompatActivity() {
         checkFirstRun()
     }
 
-    // --- LOGIKA PERTAMA KALI JALAN & BAHASA ---
+    // --- LOGIKA BAHASA & FIRST RUN ---
     private fun checkFirstRun() {
         val sp = getSharedPreferences("MFIXER_PREFS", MODE_PRIVATE)
         val isFirstTime = sp.getBoolean("is_first_time", true)
         
-        // Jika pertama kali, paksa ke bahasa Inggris
         if (isFirstTime) {
             sp.edit().putString("lang", "en").putBoolean("is_first_time", false).apply()
             setAppLocale("en")
@@ -90,7 +93,7 @@ class MainActivity : AppCompatActivity() {
         resources.updateConfiguration(config, resources.displayMetrics)
     }
 
-    // --- MENU TITIK 3 ---
+    // --- MENU TITIK 3 (Settings & About) ---
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
         return true
@@ -122,7 +125,7 @@ class MainActivity : AppCompatActivity() {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_about, null)
         val dialog = AlertDialog.Builder(this).setView(view).create()
         
-        // Profile MohFahmiMc
+        // Link GitHub MohFahmiMc
         view.findViewById<Button>(R.id.btnGithub).setOnClickListener {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/MohFahmiMc"))
             startActivity(intent)
@@ -131,21 +134,11 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    // --- SISTEM FILE & PERMISSION ---
-    private fun showPermissionPopup() {
-        val view = LayoutInflater.from(this).inflate(R.layout.dialog_permission, null)
-        val dialog = AlertDialog.Builder(this).setView(view).setCancelable(false).create()
-        
-        view.findViewById<Button>(R.id.btnContinue).setOnClickListener {
-            // Android 14 memerlukan picker manual
-            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), REQ_STORAGE)
-            dialog.dismiss()
-        }
-        dialog.show()
-    }
-
+    // --- ON ACTIVITY RESULT (Izin & Upload) ---
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        
+        // Response Izin Folder (REQ 101)
         if (requestCode == REQ_STORAGE && resultCode == Activity.RESULT_OK) {
             data?.data?.let { uri ->
                 contentResolver.takePersistableUriPermission(uri, 
@@ -155,11 +148,67 @@ class MainActivity : AppCompatActivity() {
                 refreshList()
             }
         }
+        
+        // Response Pilih File / Upload (REQ 102)
+        if (requestCode == REQ_UPLOAD && resultCode == Activity.RESULT_OK) {
+            data?.data?.let { sourceUri ->
+                handleFileUpload(sourceUri)
+            }
+        }
+    }
+
+    private fun handleFileUpload(sourceUri: Uri) {
+        val destDir = currentDir ?: return
+        LoadingHelper.show(this)
+
+        try {
+            val fileName = getFileName(sourceUri) ?: "new_file"
+            val newFile = destDir.createFile("*/*", fileName)
+            
+            if (newFile != null) {
+                contentResolver.openInputStream(sourceUri)?.use { input ->
+                    contentResolver.openOutputStream(newFile.uri)?.use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                Toast.makeText(this, "Berhasil diupload: $fileName", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Upload Gagal: ${e.message}", Toast.LENGTH_LONG).show()
+        } finally {
+            LoadingHelper.dismiss()
+            refreshList()
+        }
+    }
+
+    private fun getFileName(uri: Uri): String? {
+        var result: String? = null
+        if (uri.scheme == "content") {
+            val cursor = contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val index = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (index != -1) result = it.getString(index)
+                }
+            }
+        }
+        return result ?: uri.path?.substringAfterLast('/')
+    }
+
+    // --- SISTEM LIST & NAVIGATION ---
+    private fun showPermissionPopup() {
+        val view = LayoutInflater.from(this).inflate(R.layout.dialog_permission, null)
+        val dialog = AlertDialog.Builder(this).setView(view).setCancelable(false).create()
+        view.findViewById<Button>(R.id.btnContinue).setOnClickListener {
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), REQ_STORAGE)
+            dialog.dismiss()
+        }
+        dialog.show()
     }
 
     fun refreshList() {
         val dir = currentDir ?: return
-        LoadingHelper.show(this) // Tampilkan loading
+        LoadingHelper.show(this)
 
         tvPath.text = dir.uri.path?.substringAfterLast(":") ?: "Memory"
 
