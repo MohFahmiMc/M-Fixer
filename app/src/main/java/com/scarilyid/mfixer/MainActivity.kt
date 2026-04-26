@@ -21,7 +21,6 @@ class MainActivity : AppCompatActivity() {
     private var currentDir: DocumentFile? = null
     private val dirStack = Stack<DocumentFile>()
     private val PREFS = "MFIXER_FINAL"
-    private var clipboard: DocumentFile? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,16 +66,15 @@ class MainActivity : AppCompatActivity() {
         btnBack.visibility = if (dirStack.isEmpty()) View.GONE else View.VISIBLE
         
         val files = dir.listFiles().sortedByDescending { it.isDirectory }
-        rvFiles.adapter = FileAdapter(files, object : FileAdapter.Events {
-            override fun onClick(f: DocumentFile) {
-                if (f.isDirectory) {
-                    dirStack.push(currentDir)
-                    currentDir = f
-                    loadFiles(f)
-                } else { openCodeEditor(f) }
+        rvFiles.adapter = FileAdapter(files) { f ->
+            if (f.isDirectory) {
+                dirStack.push(currentDir)
+                currentDir = f
+                loadFiles(f)
+            } else {
+                Toast.makeText(this, "Opening Editor...", Toast.LENGTH_SHORT).show()
             }
-            override fun onLongClick(f: DocumentFile) { showFileMenu(f) }
-        })
+        }
         loading.visibility = View.GONE
     }
 
@@ -87,55 +85,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showFileMenu(f: DocumentFile) {
-        val menu = arrayOf("Copy", "Paste Here", "Rename", "Extract", "Delete")
-        AlertDialog.Builder(this).setTitle(f.name).setItems(menu) { _, i ->
-            when(i) {
-                0 -> { clipboard = f; Toast.makeText(this, "File Copied", Toast.LENGTH_SHORT).show() }
-                2 -> renameFile(f)
-                4 -> { f.delete(); loadFiles(currentDir!!) }
-            }
-        }.show()
-    }
-
-    private fun renameFile(f: DocumentFile) {
-        val input = EditText(this).apply { setText(f.name) }
-        AlertDialog.Builder(this).setTitle("Rename").setView(input).setPositiveButton("OK") { _, _ ->
-            f.renameTo(input.text.toString())
-            loadFiles(currentDir!!)
-        }.show()
-    }
-
-    private fun openCodeEditor(f: DocumentFile) {
-        val view = layoutInflater.inflate(R.layout.editor_layout, null)
-        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen)
-            .setTitle(f.name)
-            .setView(view)
-            .setPositiveButton("Save", null)
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    class FileAdapter(val list: List<DocumentFile>, val event: Events) : RecyclerView.Adapter<FileAdapter.VH>() {
-        interface Events { fun onClick(f: DocumentFile); fun onLongClick(f: DocumentFile) }
+    class FileAdapter(val list: List<DocumentFile>, val onClick: (DocumentFile) -> Unit) : RecyclerView.Adapter<FileAdapter.VH>() {
         class VH(v: View) : RecyclerView.ViewHolder(v) {
-            val name: TextView = v.findViewById(R.id.tvFileName)
-            val icon: ImageView = v.findViewById(R.id.imgIcon)
+            val name: TextView = v.findViewById(android.R.id.text1)
         }
-        override fun onCreateViewHolder(p: ViewGroup, t: Int) = VH(LayoutInflater.from(p.context).inflate(R.layout.item_file, p, false))
+        override fun onCreateViewHolder(p: ViewGroup, t: Int) = VH(LayoutInflater.from(p.context).inflate(android.R.layout.simple_list_item_1, p, false))
         override fun getItemCount() = list.size
         override fun onBindViewHolder(h: VH, p: Int) {
             val f = list[p]
             h.name.text = f.name
-            if (f.isDirectory) {
-                h.icon.setImageResource(android.R.drawable.ic_menu_add)
-                h.icon.setColorFilter(0xFF4CAF50.toInt())
-            } else {
-                h.icon.setImageResource(android.R.drawable.ic_menu_edit)
-                h.icon.setColorFilter(0xFFFFFFFF.toInt())
-            }
-            h.itemView.setOnClickListener { event.onClick(f) }
-            h.itemView.setOnLongClickListener { event.onLongClick(f); true }
+            h.name.setTextColor(0xFFFFFFFF.toInt())
+            // Pengganti Emoji ke Icon Sistem
+            val icon = if (f.isDirectory) "📁 " else "📄 "
+            h.name.text = icon + f.name
+            h.itemView.setOnClickListener { onClick(f) }
         }
     }
 }
