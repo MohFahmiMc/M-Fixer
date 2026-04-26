@@ -8,7 +8,7 @@
     <application
         android:allowBackup="true"
         android:icon="@drawable/logo"
-        android:label="M-Fixer Z-Pro"
+        android:label="M-Fixer: Mojang Directory"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
         <activity android:name=".SplashActivity" android:exported="true">
