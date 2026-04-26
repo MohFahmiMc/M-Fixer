@@ -11,7 +11,6 @@ import android.view.Menu
 import android.view.MenuItem
 import android.widget.Button
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
@@ -31,9 +30,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // 1. Load Bahasa sebelum setContentView
+        loadLocale()
+        
         setContentView(R.layout.activity_main)
 
-        // --- 1. SET UP TOOLBAR (WAJIB BIAR TITIK 3 MUNCUL) ---
+        // --- SETUP TOOLBAR ---
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.title = "M-Fixer Pro"
@@ -42,7 +45,7 @@ class MainActivity : AppCompatActivity() {
         tvPath = findViewById(R.id.tvPath)
         rvFiles.layoutManager = LinearLayoutManager(this)
 
-        // --- 2. PANGGILAN TOMBOL TAMBAH (+) ---
+        // --- TOMBOL TAMBAH (+) ---
         val fabAdd = findViewById<FloatingActionButton>(R.id.fabAdd)
         fabAdd.setOnClickListener {
             AddActionHelper.showAddMenu(this, currentDir) {
@@ -53,7 +56,41 @@ class MainActivity : AppCompatActivity() {
         checkFirstRun()
     }
 
-    // --- 3. LOGIKA MENU TITIK 3 (OVERFLOW MENU) ---
+    // --- LOGIKA PERTAMA KALI JALAN & BAHASA ---
+    private fun checkFirstRun() {
+        val sp = getSharedPreferences("MFIXER_PREFS", MODE_PRIVATE)
+        val isFirstTime = sp.getBoolean("is_first_time", true)
+        
+        // Jika pertama kali, paksa ke bahasa Inggris
+        if (isFirstTime) {
+            sp.edit().putString("lang", "en").putBoolean("is_first_time", false).apply()
+            setAppLocale("en")
+        }
+
+        val uriStr = sp.getString("root_uri", null)
+        if (uriStr == null) {
+            showPermissionPopup()
+        } else {
+            currentDir = DocumentFile.fromTreeUri(this, Uri.parse(uriStr))
+            refreshList()
+        }
+    }
+
+    private fun loadLocale() {
+        val sp = getSharedPreferences("MFIXER_PREFS", MODE_PRIVATE)
+        val lang = sp.getString("lang", "en") ?: "en"
+        setAppLocale(lang)
+    }
+
+    private fun setAppLocale(langCode: String) {
+        val locale = Locale(langCode)
+        Locale.setDefault(locale)
+        val config = resources.configuration
+        config.setLocale(locale)
+        resources.updateConfiguration(config, resources.displayMetrics)
+    }
+
+    // --- MENU TITIK 3 ---
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
         return true
@@ -67,7 +104,6 @@ class MainActivity : AppCompatActivity() {
         return super.onOptionsItemSelected(item)
     }
 
-    // --- 4. LOGIKA GANTI BAHASA (LOCALE API) ---
     private fun showLanguageDialog() {
         val languages = arrayOf("English", "Indonesia", "Basa Jawa", "Basa Sunda", "日本語 (Japan)")
         val codes = arrayOf("en", "id", "jv", "su", "ja")
@@ -75,28 +111,18 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("Select Language")
             .setItems(languages) { _, which ->
-                val locale = Locale(codes[which])
-                Locale.setDefault(locale)
-                val config = resources.configuration
-                config.setLocale(locale)
-                
-                // Update resource untuk bahasa baru
-                resources.updateConfiguration(config, resources.displayMetrics)
-                
-                // Simpan pilihan ke Preference agar permanen (Opsional)
                 getSharedPreferences("MFIXER_PREFS", MODE_PRIVATE).edit()
                     .putString("lang", codes[which]).apply()
-
-                recreate() // Restart UI agar bahasa berubah
+                setAppLocale(codes[which])
+                recreate() 
             }.show()
     }
 
-    // --- 5. LOGIKA ABOUT DEVELOPER (GitHub MohFahmiMc) ---
     private fun showAboutDialog() {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_about, null)
         val dialog = AlertDialog.Builder(this).setView(view).create()
         
-        // Klik tombol GitHub untuk buka profil kamu
+        // Profile MohFahmiMc
         view.findViewById<Button>(R.id.btnGithub).setOnClickListener {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/MohFahmiMc"))
             startActivity(intent)
@@ -105,26 +131,13 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun checkFirstRun() {
-        val sp = getSharedPreferences("MFIXER_PREFS", MODE_PRIVATE)
-        val uriStr = sp.getString("root_uri", null)
-
-        if (uriStr == null) {
-            showPermissionPopup()
-        } else {
-            currentDir = DocumentFile.fromTreeUri(this, Uri.parse(uriStr))
-            refreshList()
-        }
-    }
-
+    // --- SISTEM FILE & PERMISSION ---
     private fun showPermissionPopup() {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_permission, null)
-        val dialog = AlertDialog.Builder(this)
-            .setView(view)
-            .setCancelable(false)
-            .create()
+        val dialog = AlertDialog.Builder(this).setView(view).setCancelable(false).create()
         
         view.findViewById<Button>(R.id.btnContinue).setOnClickListener {
+            // Android 14 memerlukan picker manual
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), REQ_STORAGE)
             dialog.dismiss()
         }
@@ -146,9 +159,7 @@ class MainActivity : AppCompatActivity() {
 
     fun refreshList() {
         val dir = currentDir ?: return
-
-        // --- 6. PANGGILAN LOADING SAAT PINDAH FOLDER ---
-        LoadingHelper.show(this)
+        LoadingHelper.show(this) // Tampilkan loading
 
         tvPath.text = dir.uri.path?.substringAfterLast(":") ?: "Memory"
 
@@ -170,9 +181,7 @@ class MainActivity : AppCompatActivity() {
                     ActionHelper.showZMenu(this, selected) { refreshList() }
                 }
             }
-
             LoadingHelper.dismiss()
-            
         }, 300) 
     }
 
