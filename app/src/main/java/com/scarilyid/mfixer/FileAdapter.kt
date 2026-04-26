@@ -10,32 +10,31 @@ import java.util.*
 
 class FileAdapter(
     private val files: List<DocumentFile>,
-    private val onClick: (DocumentFile) -> Unit
-) : RecyclerView.Adapter<FileAdapter.VH>() {
+    private val onFileClick: (DocumentFile) -> Unit
+) : RecyclerView.Adapter<FileAdapter.FileViewHolder>() {
 
-    class VH(v: View) : RecyclerView.ViewHolder(v) {
+    class FileViewHolder(v: View) : RecyclerView.ViewHolder(v) {
         val name: TextView = v.findViewById(R.id.tvFileName)
         val info: TextView = v.findViewById(R.id.tvDetails)
         val date: TextView = v.findViewById(R.id.tvDate)
         val icon: ImageView = v.findViewById(R.id.imgIcon)
     }
 
-    override fun onCreateViewHolder(p: ViewGroup, t: Int): VH {
+    override fun onCreateViewHolder(p: ViewGroup, t: Int): FileViewHolder {
         val v = LayoutInflater.from(p.context).inflate(R.layout.item_file, p, false)
-        return VH(v)
+        return FileViewHolder(v)
     }
 
-    override fun onBindViewHolder(h: VH, p: Int) {
+    override fun onBindViewHolder(h: FileViewHolder, p: Int) {
         val f = files[p]
         h.name.text = f.name
         
-        // Format tarikh ala ZArchiver
         val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
         h.date.text = sdf.format(Date(f.lastModified()))
 
-        // Set Ikon & Detail (Ikon Orange tanpa Emoji)
+        // Logika Ikon Sistem (Tanpa Emoji)
         if (f.isDirectory) {
-            h.icon.setImageResource(R.drawable.ic_folder_orange) 
+            h.icon.setImageResource(R.drawable.ic_folder_orange)
             h.info.text = "${f.listFiles().size} items"
         } else {
             val ext = f.name?.substringAfterLast(".", "")?.lowercase()
@@ -47,12 +46,12 @@ class FileAdapter(
             h.info.text = "${f.length() / 1024} KB"
         }
 
-        // --- ANIMASI CSS-LIKE (Biar tak lemot) ---
-        val anim = AnimationUtils.loadAnimation(h.itemView.context, android.R.anim.slide_in_left)
-        anim.startOffset = (p * 30).toLong() // Efek muncul satu-satu
-        h.itemView.startAnimation(anim)
+        // --- ANIMASI MODERN (Slide In Left) ---
+        val animation = AnimationUtils.loadAnimation(h.itemView.context, android.R.anim.slide_in_left)
+        animation.startOffset = (p * 25).toLong()
+        h.itemView.startAnimation(animation)
 
-        h.itemView.setOnClickListener { onClick(f) }
+        h.itemView.setOnClickListener { onFileClick(f) }
     }
 
     override fun getItemCount() = files.size
