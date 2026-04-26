@@ -18,10 +18,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvPath: TextView
     private var currentDir: DocumentFile? = null
     private val backStack = Stack<DocumentFile>()
-    private val PREFS = "MFIXER_STABLE_V4"
-
-    // Settings (Fahmi can change later in settings menu)
-    private var showHiddenFiles = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,122 +27,117 @@ class MainActivity : AppCompatActivity() {
         tvPath = findViewById(R.id.tvPath)
         rvFiles.layoutManager = LinearLayoutManager(this)
 
-        findViewById<View>(R.id.fabAdd).setOnClickListener { showCreateMenu() }
-
-        initializeStorage()
+        findViewById<View>(R.id.fabAdd).setOnClickListener { showCreateDialog() }
+        
+        setupRoot()
     }
 
-    // --- Toolbar Menu (Simpel) ---
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menu.add("Cari").setIcon(android.R.drawable.ic_menu_search).setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
-        menu.add("Pengaturan")
-        menu.add("Tentang") // Kredit MohFahmiMc dipindah kesini
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        when(item.title) {
-            "Tentang" -> AlertDialog.Builder(this)
-                .setTitle("M-Fixer Stable")
-                .setMessage("Created by MohFahmiMc\nVersion 4.0.0\nAmaze File Manager Logic base.")
-                .setPositiveButton("OK", null).show()
-        }
-        return super.onOptionsItemSelected(item)
-    }
-
-    // --- Storage & Permission ala Amaze/ZArchiver ---
-    private fun initializeStorage() {
-        val sp = getSharedPreferences(PREFS, MODE_PRIVATE)
-        val uriStr = sp.getString("root_uri", null)
+    private fun setupRoot() {
+        val sp = getSharedPreferences("MFIXER_STABLE", MODE_PRIVATE)
+        val uriStr = sp.getString("root", null)
         if (uriStr == null) {
-            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), 100)
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), 99)
         } else {
             currentDir = DocumentFile.fromTreeUri(this, Uri.parse(uriStr))
-            loadFolderFiles(currentDir!!)
+            loadFiles(currentDir!!)
         }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 100 && resultCode == RESULT_OK) {
+        if (requestCode == 99 && resultCode == RESULT_OK) {
             data?.data?.let { uri ->
                 contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("root_uri", uri.toString()).apply()
+                getSharedPreferences("MFIXER_STABLE", MODE_PRIVATE).edit().putString("root", uri.toString()).apply()
                 currentDir = DocumentFile.fromTreeUri(this, uri)
-                loadFolderFiles(currentDir!!)
+                loadFiles(currentDir!!)
             }
         }
     }
 
-    private fun loadFolderFiles(dir: DocumentFile) {
-        // Path bersih ala ZArchiver
-        tvPath.text = dir.uri.path?.replace("/tree/", "")?.substringAfterLast(":") ?: "Internal Storage"
+    private fun loadFiles(dir: DocumentFile) {
+        tvPath.text = dir.uri.path?.substringAfterLast(":")
+        val files = dir.listFiles().sortedWith(compareByDescending<DocumentFile> { it.isDirectory }.thenBy { it.name?.lowercase() })
         
-        // Ambil file, urutkan: Folder dulu, lalu File (ABC)
-        val rawFiles = dir.listFiles().toMutableList()
-        
-        // Filter hidden files (Fahmi's request: .folder tersembunyi)
-        if (!showHiddenFiles) {
-            rawFiles.removeAll { it.name?.startsWith(".") ?: false }
-        }
-
-        val sortedFiles = rawFiles.sortedWith(compareByDescending<DocumentFile> { it.isDirectory }.thenBy { it.name?.lowercase() })
-        
-        rvFiles.adapter = FileAdapter(sortedFiles, { file ->
-            if (file.isDirectory) {
+        rvFiles.adapter = FileAdapter(files, { f ->
+            if (f.isDirectory) {
                 backStack.push(currentDir)
-                currentDir = file
-                loadFolderFiles(file)
-            } else {
-                handleFileClickAction(file)
-            }
-        }, { longFile ->
-            showContextMenu(longFile)
-        })
+                currentDir = f
+                loadFiles(f)
+            } else { handleFile(f) }
+        }, { f -> showContext(f) })
     }
 
-    private fun handleFileClickAction(f: DocumentFile) {
-        val name = f.name?.lowercase() ?: ""
+    private fun handleFile(f: DocumentFile) {
+        val n = f.name?.lowercase() ?: ""
         when {
-            name.endsWith(".zip") -> showZipActions(f)
-            name.endsWith(".txt") || name.endsWith(".json") || name.endsWith(".js") -> openFileEditor(f)
-            else -> Toast.makeText(this, "File: ${f.name}", Toast.LENGTH_SHORT).show()
+            n.endsWith(".zip") -> showZipAction(f)
+            n.endsWith(".txt") || n.endsWith(".json") || n.endsWith(".js") -> openFileEditor(f)
+            n.endsWith(".png") || n.endsWith(".jpg") -> openGallery(f)
+            else -> Toast.makeText(this, "File: $n", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun showZipActions(f: DocumentFile) {
-        val ops = arrayOf("Lihat (View)", "Ekstrak Di Sini", "Kompres (Zip)")
-        AlertDialog.Builder(this).setTitle("ZIP Manager").setItems(ops) { _, i ->
-            when(i) {
-                0 -> Toast.makeText(this, "Membuka ZIP... (View Mode)", Toast.LENGTH_SHORT).show()
-                1 -> Toast.makeText(this, "Ekstrak Sukses!", Toast.LENGTH_SHORT).show()
+    private fun openFileEditor(f: DocumentFile) {
+        val et = EditText(this).apply {
+            val content = contentResolver.openInputStream(f.uri)?.bufferedReader()?.use { it.readText() }
+            setText(content)
+            setTextColor(0xFF00FF00.toInt())
+            setBackgroundColor(0xFF000000.toInt())
+            typeface = android.graphics.Typeface.MONOSPACE
+            gravity = Gravity.TOP
+            setPadding(30, 30, 30, 30)
+        }
+        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen)
+            .setTitle(f.name).setView(et).setPositiveButton("SIMPAN") { _, _ ->
+                contentResolver.openOutputStream(f.uri, "wt")?.use { it.write(et.text.toString().toByteArray()) }
+            }.setNegativeButton("BATAL", null).show()
+    }
+
+    private fun openGallery(f: DocumentFile) {
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(f.uri, "image/*")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(intent, "Buka Gambar Dengan"))
+    }
+
+    private fun showZipAction(f: DocumentFile) {
+        val ops = arrayOf("Lihat Isi", "Ekstrak Di Sini", "Kompres")
+        AlertDialog.Builder(this).setTitle(f.name).setItems(ops) { _, i ->
+            if (i == 1) Toast.makeText(this, "Mengekstrak...", Toast.LENGTH_SHORT).show()
+        }.show()
+    }
+
+    private fun showCreateDialog() {
+        val ops = arrayOf("Folder Baru", "Script (.txt)", "Import File")
+        AlertDialog.Builder(this).setItems(ops) { _, i ->
+            if (i == 2) {
+                val it = Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*" }
+                startActivityForResult(it, 101)
+            } else {
+                val et = EditText(this)
+                AlertDialog.Builder(this).setTitle("Buat Baru").setView(et).setPositiveButton("OK") { _, _ ->
+                    if (i == 0) currentDir?.createDirectory(et.text.toString())
+                    else currentDir?.createFile("text/plain", et.text.toString())
+                    loadFiles(currentDir!!)
+                }.show()
             }
         }.show()
     }
 
-    private fun showCreateMenu() {
-        val options = arrayOf("Folder Baru", "File Script (.txt)")
-        AlertDialog.Builder(this).setItems(options) { _, i ->
-            val et = EditText(this).apply { hint = if (i == 0) "Nama Folder" else "Nama File" }
-            AlertDialog.Builder(this).setTitle("Create").setView(et).setPositiveButton("OK") { _, _ ->
-                val name = et.text.toString()
-                if (i == 0) currentDir?.createDirectory(name) else currentDir?.createFile("text/plain", name)
-                loadFolderFiles(currentDir!!)
-            }.show()
-        }.show()
-    }
-
-    private fun showContextMenu(f: DocumentFile) {
-        val ops = arrayOf("Ganti Nama", "Hapus", "Details")
+    private fun showContext(f: DocumentFile) {
+        val ops = arrayOf("Ganti Nama", "Hapus", "Info")
         AlertDialog.Builder(this).setTitle(f.name).setItems(ops) { _, i ->
-            if (i == 0) {
-                val et = EditText(this).apply { setText(f.name) }
-                AlertDialog.Builder(this).setTitle("Rename").setView(et).setPositiveButton("OK") { _, _ ->
-                    f.renameTo(et.text.toString())
-                    loadFolderFiles(currentDir!!)
-                }.show()
-            } else if (i == 1) {
-                f.delete(); loadFolderFiles(currentDir!!)
+            when(i) {
+                0 -> {
+                    val et = EditText(this).apply { setText(f.name) }
+                    AlertDialog.Builder(this).setTitle("Rename").setView(et).setPositiveButton("OK") { _, _ ->
+                        f.renameTo(et.text.toString())
+                        loadFiles(currentDir!!)
+                    }.show()
+                }
+                1 -> { f.delete(); loadFiles(currentDir!!) }
             }
         }.show()
     }
@@ -154,44 +145,21 @@ class MainActivity : AppCompatActivity() {
     override fun onBackPressed() {
         if (backStack.isNotEmpty()) {
             currentDir = backStack.pop()
-            loadFolderFiles(currentDir!!)
-        } else {
-            super.onBackPressed()
-        }
+            loadFiles(currentDir!!)
+        } else super.onBackPressed()
     }
 
-    // --- File Adapter (ZArchiver Style) ---
+    // --- Adapter (Gaya ZArchiver) ---
     class FileAdapter(val list: List<DocumentFile>, val onClick: (DocumentFile) -> Unit, val onLong: (DocumentFile) -> Unit) : RecyclerView.Adapter<FileAdapter.VH>() {
-        class VH(v: View) : RecyclerView.ViewHolder(v) {
-            val name: TextView = v.findViewById(R.id.tvFileName)
-            val details: TextView = v.findViewById(R.id.tvDetails)
-            val date: TextView = v.findViewById(R.id.tvDate)
-            val icon: ImageView = v.findViewById(R.id.imgIcon)
-        }
-        override fun onCreateViewHolder(p: ViewGroup, t: Int) = VH(LayoutInflater.from(p.context).inflate(R.layout.item_file, p, false))
+        class VH(v: View) : RecyclerView.ViewHolder(v) { val t: TextView = v.findViewById(android.R.id.text1) }
+        override fun onCreateViewHolder(p: ViewGroup, t: Int) = VH(LayoutInflater.from(p.context).inflate(android.R.layout.simple_list_item_1, p, false))
         override fun getItemCount() = list.size
         override fun onBindViewHolder(h: VH, p: Int) {
             val f = list[p]
-            h.name.text = f.name
-            
-            // Detail: Jumlah item (folder) atau Ukuran (file) ala Amaze
-            if (f.isDirectory) {
-                val count = f.listFiles().size
-                h.details.text = if (count == 0) "Empty" else "$count items"
-                // Ikon Folder Orange Besar ala ZArchiver
-                h.icon.setImageResource(android.R.drawable.ic_dialog_map)
-                h.icon.setColorFilter(0xFFFF9800.toInt()) // Warna Orange
-            } else {
-                h.details.text = "${f.length() / 1024} KB"
-                // Ikon File Teks
-                h.icon.setImageResource(android.R.drawable.ic_menu_edit)
-                h.icon.setColorFilter(0xFFFFFFFF.toInt()) // Warna Putih
-            }
-
-            // Tanggal Modifikasi (Kanan)
-            val df = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-            h.date.text = df.format(Date(f.lastModified()))
-            
+            val date = SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(Date(f.lastModified()))
+            val size = if (f.isDirectory) "${f.listFiles().size} items" else "${f.length()/1024} KB"
+            h.t.text = "${if(f.isDirectory) "📁" else "📄"} ${f.name}\n$size | $date"
+            h.t.setTextColor(0xFFFFFFFF.toInt())
             h.itemView.setOnClickListener { onClick(f) }
             h.itemView.setOnLongClickListener { onLong(f); true }
         }
