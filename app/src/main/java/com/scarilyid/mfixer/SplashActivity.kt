@@ -9,28 +9,23 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 
 class SplashActivity : AppCompatActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_splash)
 
         val pb = findViewById<ProgressBar>(R.id.pbLoading)
         val tv = findViewById<TextView>(R.id.tvPersen)
+        var progress = 0
 
-        var progressStatus = 0
-        val handler = Handler(Looper.getMainLooper())
-
-        // Jalankan loading palsu biar keren
         Thread {
-            while (progressStatus < 100) {
-                progressStatus += 2
-                Thread.sleep(30) // Kecepatan loading
-                handler.post {
-                    pb.progress = progressStatus
-                    tv.text = "$progressStatus%"
+            while (progress < 100) {
+                progress += 2
+                Thread.sleep(30)
+                Handler(Looper.getMainLooper()).post {
+                    pb.progress = progress
+                    tv.text = "$progress%"
                 }
             }
-            // Jika sudah 100%, pindah ke MainActivity
             startActivity(Intent(this, MainActivity::class.java))
             finish()
         }.start()
