@@ -96,11 +96,11 @@
         android:id="@+id/loadingLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#E6000000"
+        android:background="#CC000000"
         android:visibility="gone">
         <ProgressBar
-            android:layout_width="60dp"
-            android:layout_height="60dp"
+            android:layout_width="55dp"
+            android:layout_height="55dp"
             android:layout_gravity="center"
             android:indeterminateTint="#4CAF50" />
     </FrameLayout>
