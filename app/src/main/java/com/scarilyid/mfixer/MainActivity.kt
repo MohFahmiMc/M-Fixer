@@ -16,7 +16,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen // Wajib ada
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.documentfile.provider.DocumentFile
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -33,13 +33,24 @@ class MainActivity : AppCompatActivity() {
     private val REQ_STORAGE = 101 
     private val REQ_UPLOAD = 102  
 
+    // Variabel untuk mengontrol kapan Splash Screen berhenti
+    private var isReady = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 1. Jalankan Splash Screen sebelum super.onCreate (Trend 2026)
+        // 1. Inisialisasi Splash Screen (Wajib paling atas)
         val splashScreen = installSplashScreen()
         
         super.onCreate(savedInstanceState)
         
-        // 2. Load Bahasa agar langsung Inggris di awal
+        // 2. Logika agar Splash Screen berhenti (Fix Nyangkut/Crash)
+        splashScreen.setKeepOnScreenCondition { !isReady }
+        
+        // Atur agar loading hilang setelah 2 detik (Biar estetik)
+        Handler(Looper.getMainLooper()).postDelayed({
+            isReady = true
+        }, 2000)
+
+        // 3. Load Bahasa
         loadLocale()
         
         setContentView(R.layout.activity_main)
@@ -47,7 +58,6 @@ class MainActivity : AppCompatActivity() {
         // --- SETUP TOOLBAR ---
         toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
-        // Nama Aplikasi Baru sesuai permintaanmu
         supportActionBar?.title = "M-Fixer: Mojang directory"
 
         rvFiles = findViewById(R.id.rvFiles)
@@ -98,11 +108,9 @@ class MainActivity : AppCompatActivity() {
         resources.updateConfiguration(config, resources.displayMetrics)
     }
 
-    // --- MENU TITIK 3 (Fix Warna & Logika) ---
+    // --- MENU TITIK 3 (Fix Warna) ---
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
-        
-        // Paksa ikon titik 3 jadi Putih agar terlihat jelas
         toolbar.overflowIcon?.setTint(Color.WHITE)
         return true
     }
@@ -141,11 +149,11 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    // --- ON ACTIVITY RESULT (Izin & Upload) ---
+    // --- ON ACTIVITY RESULT ---
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         
-        if (requestCode == REQ_STORAGE && resultCode == Activity.RESULT_OK) {
+        if (requestCode == RE_STORAGE && resultCode == Activity.RESULT_OK) {
             data?.data?.let { uri ->
                 contentResolver.takePersistableUriPermission(uri, 
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
@@ -155,8 +163,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // Menangani hasil pilih file dari ZArchiver/File Manager
-        if (requestCode == REQ_UPLOAD && resultCode == Activity.RESULT_OK) {
+        if (requestCode == RE_UPLOAD && resultCode == Activity.RESULT_OK) {
             data?.data?.let { sourceUri ->
                 handleFileUpload(sourceUri)
             }
@@ -206,7 +213,7 @@ class MainActivity : AppCompatActivity() {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_permission, null)
         val dialog = AlertDialog.Builder(this).setView(view).setCancelable(false).create()
         view.findViewById<Button>(R.id.btnContinue).setOnClickListener {
-            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), REQ_STORAGE)
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), RE_STORAGE)
             dialog.dismiss()
         }
         dialog.show()
