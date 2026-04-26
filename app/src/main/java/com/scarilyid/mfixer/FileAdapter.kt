@@ -39,7 +39,7 @@ class FileAdapter(
             h.info.text = "${f.length() / 1024} KB"
         }
 
-        // Animasi CSS-Style agar tidak kaku
+        // Animasi agar tidak kaku (Smooth ala CSS)
         val anim = AnimationUtils.loadAnimation(h.itemView.context, android.R.anim.slide_in_left)
         anim.startOffset = (p * 30).toLong()
         h.itemView.startAnimation(anim)
