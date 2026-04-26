@@ -28,7 +28,6 @@ class MainActivity : AppCompatActivity() {
         rvFiles.layoutManager = LinearLayoutManager(this)
 
         findViewById<View>(R.id.fabAdd).setOnClickListener { showCreateDialog() }
-        
         setupRoot()
     }
 
@@ -73,7 +72,6 @@ class MainActivity : AppCompatActivity() {
         when {
             n.endsWith(".zip") -> showZipAction(f)
             n.endsWith(".txt") || n.endsWith(".json") || n.endsWith(".js") -> openFileEditor(f)
-            n.endsWith(".png") || n.endsWith(".jpg") -> openGallery(f)
             else -> Toast.makeText(this, "File: $n", Toast.LENGTH_SHORT).show()
         }
     }
@@ -86,59 +84,33 @@ class MainActivity : AppCompatActivity() {
             setBackgroundColor(0xFF000000.toInt())
             typeface = android.graphics.Typeface.MONOSPACE
             gravity = Gravity.TOP
-            setPadding(30, 30, 30, 30)
+            setPadding(35, 35, 35, 35)
         }
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen)
-            .setTitle(f.name).setView(et).setPositiveButton("SIMPAN") { _, _ ->
+            .setTitle(f.name).setView(et).setPositiveButton("Simpan") { _, _ ->
                 contentResolver.openOutputStream(f.uri, "wt")?.use { it.write(et.text.toString().toByteArray()) }
-            }.setNegativeButton("BATAL", null).show()
-    }
-
-    private fun openGallery(f: DocumentFile) {
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(f.uri, "image/*")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        startActivity(Intent.createChooser(intent, "Buka Gambar Dengan"))
+            }.setNegativeButton("Batal", null).show()
     }
 
     private fun showZipAction(f: DocumentFile) {
-        val ops = arrayOf("Lihat Isi", "Ekstrak Di Sini", "Kompres")
+        val ops = arrayOf("Lihat Isi", "Ekstrak Di Sini")
         AlertDialog.Builder(this).setTitle(f.name).setItems(ops) { _, i ->
-            if (i == 1) Toast.makeText(this, "Mengekstrak...", Toast.LENGTH_SHORT).show()
+            if (i == 1) Toast.makeText(this, "Extracting...", Toast.LENGTH_SHORT).show()
         }.show()
     }
 
     private fun showCreateDialog() {
-        val ops = arrayOf("Folder Baru", "Script (.txt)", "Import File")
-        AlertDialog.Builder(this).setItems(ops) { _, i ->
-            if (i == 2) {
-                val it = Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*" }
-                startActivityForResult(it, 101)
-            } else {
-                val et = EditText(this)
-                AlertDialog.Builder(this).setTitle("Buat Baru").setView(et).setPositiveButton("OK") { _, _ ->
-                    if (i == 0) currentDir?.createDirectory(et.text.toString())
-                    else currentDir?.createFile("text/plain", et.text.toString())
-                    loadFiles(currentDir!!)
-                }.show()
-            }
+        val et = EditText(this)
+        AlertDialog.Builder(this).setTitle("Folder Baru").setView(et).setPositiveButton("OK") { _, _ ->
+            currentDir?.createDirectory(et.text.toString())
+            loadFiles(currentDir!!)
         }.show()
     }
 
     private fun showContext(f: DocumentFile) {
-        val ops = arrayOf("Ganti Nama", "Hapus", "Info")
+        val ops = arrayOf("Ganti Nama", "Hapus")
         AlertDialog.Builder(this).setTitle(f.name).setItems(ops) { _, i ->
-            when(i) {
-                0 -> {
-                    val et = EditText(this).apply { setText(f.name) }
-                    AlertDialog.Builder(this).setTitle("Rename").setView(et).setPositiveButton("OK") { _, _ ->
-                        f.renameTo(et.text.toString())
-                        loadFiles(currentDir!!)
-                    }.show()
-                }
-                1 -> { f.delete(); loadFiles(currentDir!!) }
-            }
+            if (i == 1) { f.delete(); loadFiles(currentDir!!) }
         }.show()
     }
 
@@ -149,16 +121,13 @@ class MainActivity : AppCompatActivity() {
         } else super.onBackPressed()
     }
 
-    // --- Adapter (Gaya ZArchiver) ---
     class FileAdapter(val list: List<DocumentFile>, val onClick: (DocumentFile) -> Unit, val onLong: (DocumentFile) -> Unit) : RecyclerView.Adapter<FileAdapter.VH>() {
         class VH(v: View) : RecyclerView.ViewHolder(v) { val t: TextView = v.findViewById(android.R.id.text1) }
         override fun onCreateViewHolder(p: ViewGroup, t: Int) = VH(LayoutInflater.from(p.context).inflate(android.R.layout.simple_list_item_1, p, false))
         override fun getItemCount() = list.size
         override fun onBindViewHolder(h: VH, p: Int) {
             val f = list[p]
-            val date = SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(Date(f.lastModified()))
-            val size = if (f.isDirectory) "${f.listFiles().size} items" else "${f.length()/1024} KB"
-            h.t.text = "${if(f.isDirectory) "📁" else "📄"} ${f.name}\n$size | $date"
+            h.t.text = "${if(f.isDirectory) "📁" else "📄"} ${f.name}"
             h.t.setTextColor(0xFFFFFFFF.toInt())
             h.itemView.setOnClickListener { onClick(f) }
             h.itemView.setOnLongClickListener { onLong(f); true }
