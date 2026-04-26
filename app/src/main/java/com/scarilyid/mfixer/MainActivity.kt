@@ -2,6 +2,7 @@ package com.scarilyid.mfixer
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -25,6 +26,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var rvFiles: RecyclerView
     private lateinit var tvPath: TextView
+    private lateinit var toolbar: Toolbar
     private var currentDir: DocumentFile? = null
     private val folderStack = Stack<DocumentFile>()
     private val REQ_STORAGE = 101 // Izin Folder Minecraft
@@ -38,8 +40,8 @@ class MainActivity : AppCompatActivity() {
         
         setContentView(R.layout.activity_main)
 
-        // --- SETUP TOOLBAR (Titik 3 Fix) ---
-        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        // --- SETUP TOOLBAR ---
+        toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.title = "M-Fixer Pro"
 
@@ -50,9 +52,7 @@ class MainActivity : AppCompatActivity() {
         // --- TOMBOL TAMBAH (+) ---
         val fabAdd = findViewById<FloatingActionButton>(R.id.fabAdd)
         fabAdd.setOnClickListener {
-            // Memanggil helper menu tambah yang sekarang sudah mengarahkan ke Picker File
             AddActionHelper.showAddMenu(this, currentDir) {
-                // Callback jika butuh refresh
                 refreshList() 
             }
         }
@@ -93,9 +93,16 @@ class MainActivity : AppCompatActivity() {
         resources.updateConfiguration(config, resources.displayMetrics)
     }
 
-    // --- MENU TITIK 3 (Settings & About) ---
+    // --- MENU TITIK 3 (Fix Warna & Logika) ---
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+        
+        // TRIK: Paksa ikon titik 3 jadi Putih agar terlihat di background gelap
+        val drawable = toolbar.overflowIcon
+        drawable?.let {
+            it.setTint(Color.WHITE)
+            toolbar.overflowIcon = it
+        }
         return true
     }
 
@@ -125,7 +132,6 @@ class MainActivity : AppCompatActivity() {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_about, null)
         val dialog = AlertDialog.Builder(this).setView(view).create()
         
-        // Link GitHub MohFahmiMc
         view.findViewById<Button>(R.id.btnGithub).setOnClickListener {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/MohFahmiMc"))
             startActivity(intent)
@@ -163,6 +169,7 @@ class MainActivity : AppCompatActivity() {
 
         try {
             val fileName = getFileName(sourceUri) ?: "new_file"
+            // Android 14 butuh MIME type yang jelas, "*/*" untuk umum
             val newFile = destDir.createFile("*/*", fileName)
             
             if (newFile != null) {
@@ -171,10 +178,12 @@ class MainActivity : AppCompatActivity() {
                         input.copyTo(output)
                     }
                 }
-                Toast.makeText(this, "Berhasil diupload: $fileName", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Success: $fileName uploaded", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Failed to create file in destination", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Toast.makeText(this, "Upload Gagal: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Upload Error: ${e.message}", Toast.LENGTH_LONG).show()
         } finally {
             LoadingHelper.dismiss()
             refreshList()
