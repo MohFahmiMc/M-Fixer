@@ -16,6 +16,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen // Wajib ada
 import androidx.documentfile.provider.DocumentFile
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -29,13 +30,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var toolbar: Toolbar
     private var currentDir: DocumentFile? = null
     private val folderStack = Stack<DocumentFile>()
-    private val REQ_STORAGE = 101 // Izin Folder Minecraft
-    private val REQ_UPLOAD = 102  // Pilih File (Upload)
+    private val REQ_STORAGE = 101 
+    private val REQ_UPLOAD = 102  
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 1. Jalankan Splash Screen sebelum super.onCreate (Trend 2026)
+        val splashScreen = installSplashScreen()
+        
         super.onCreate(savedInstanceState)
         
-        // 1. Load Bahasa sebelum tampilkan UI
+        // 2. Load Bahasa agar langsung Inggris di awal
         loadLocale()
         
         setContentView(R.layout.activity_main)
@@ -43,7 +47,8 @@ class MainActivity : AppCompatActivity() {
         // --- SETUP TOOLBAR ---
         toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
-        supportActionBar?.title = "M-Fixer Pro"
+        // Nama Aplikasi Baru sesuai permintaanmu
+        supportActionBar?.title = "M-Fixer: Mojang directory"
 
         rvFiles = findViewById(R.id.rvFiles)
         tvPath = findViewById(R.id.tvPath)
@@ -97,12 +102,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
         
-        // TRIK: Paksa ikon titik 3 jadi Putih agar terlihat di background gelap
-        val drawable = toolbar.overflowIcon
-        drawable?.let {
-            it.setTint(Color.WHITE)
-            toolbar.overflowIcon = it
-        }
+        // Paksa ikon titik 3 jadi Putih agar terlihat jelas
+        toolbar.overflowIcon?.setTint(Color.WHITE)
         return true
     }
 
@@ -144,7 +145,6 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         
-        // Response Izin Folder (REQ 101)
         if (requestCode == REQ_STORAGE && resultCode == Activity.RESULT_OK) {
             data?.data?.let { uri ->
                 contentResolver.takePersistableUriPermission(uri, 
@@ -155,7 +155,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // Response Pilih File / Upload (REQ 102)
+        // Menangani hasil pilih file dari ZArchiver/File Manager
         if (requestCode == REQ_UPLOAD && resultCode == Activity.RESULT_OK) {
             data?.data?.let { sourceUri ->
                 handleFileUpload(sourceUri)
@@ -169,7 +169,6 @@ class MainActivity : AppCompatActivity() {
 
         try {
             val fileName = getFileName(sourceUri) ?: "new_file"
-            // Android 14 butuh MIME type yang jelas, "*/*" untuk umum
             val newFile = destDir.createFile("*/*", fileName)
             
             if (newFile != null) {
@@ -179,8 +178,6 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 Toast.makeText(this, "Success: $fileName uploaded", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Failed to create file in destination", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             Toast.makeText(this, "Upload Error: ${e.message}", Toast.LENGTH_LONG).show()
