@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#222222"
+    android:orientation="vertical"
+    android:padding="15dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Tambah Baru"
+        android:textColor="#FF9800"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:padding="10dp" />
+
+    <LinearLayout
+        android:id="@+id/btnNewFolder"
+        style="@style/ZMenuRow">
+        <ImageView
+            style="@style/ZMenuIcon"
+            android:src="@android:drawable/ic_menu_add"
+            android:tint="#4CAF50" />
+        <TextView
+            style="@style/ZMenuText"
+            android:text="Buat Folder Baru" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/btnNewFile"
+        style="@style/ZMenuRow">
+        <ImageView
+            style="@style/ZMenuIcon"
+            android:src="@android:drawable/ic_menu_upload" />
+        <TextView
+            style="@style/ZMenuText"
+            android:text="Tambah File (Upload)" />
+    </LinearLayout>
+
+</LinearLayout>
+          
