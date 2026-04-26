@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.documentfile.provider.DocumentFile
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -12,10 +13,17 @@ import androidx.recyclerview.widget.RecyclerView
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
+
     private lateinit var rvFiles: RecyclerView
     private lateinit var tvPath: TextView
+    
     private var currentDir: DocumentFile? = null
-    private val backStack = Stack<DocumentFile>()
+    
+    // Fitur 'Previous Folder' menggunakan Stack
+    private val folderHistory = Stack<DocumentFile>()
+    
+    private val PREF_KEY = "MFIXER_ROOT_URI"
+    private val REQUEST_CODE_OPEN_DIRECTORY = 1212
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,67 +33,94 @@ class MainActivity : AppCompatActivity() {
         tvPath = findViewById(R.id.tvPath)
         rvFiles.layoutManager = LinearLayoutManager(this)
 
-        initStorage()
+        initStorageAccess()
     }
 
-    private fun initStorage() {
-        val sp = getSharedPreferences("Z_DATA", MODE_PRIVATE)
-        val uriStr = sp.getString("root", null)
-        
-        if (uriStr == null) {
-            // Minta folder ZArchiver/Minecraft buat kali pertama
-            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), 999)
+    private fun initStorageAccess() {
+        val sp = getSharedPreferences("Z_PRO_PREFS", MODE_PRIVATE)
+        val savedUri = sp.getString(PREF_KEY, null)
+
+        if (savedUri == null) {
+            // Minta akses folder pertama kali
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+            startActivityForResult(intent, REQUEST_CODE_OPEN_DIRECTORY)
         } else {
-            currentDir = DocumentFile.fromTreeUri(this, Uri.parse(uriStr))
-            renderFiles()
-        }
-    }
-
-    fun renderFiles() {
-        currentDir?.let { dir ->
-            tvPath.text = dir.uri.path?.substringAfterLast(":")
-            
-            // Sorting pro: Folder dulu baru file
-            val list = dir.listFiles().sortedWith(compareByDescending<DocumentFile> { it.isDirectory }
-                .thenBy { it.name?.lowercase() })
-            
-            rvFiles.adapter = FileAdapter(list) { selected ->
-                if (selected.isDirectory) {
-                    backStack.push(currentDir)
-                    currentDir = selected
-                    renderFiles()
-                } else {
-                    // Panggil BottomSheet Menu (ActionHelper.kt)
-                    ActionHelper.showZMenu(this, selected) { action ->
-                        if (action == "DELETE") {
-                            selected.delete()
-                            renderFiles()
-                        }
-                        // Tambah aksi lain di sini
-                    }
-                }
-            }
+            currentDir = DocumentFile.fromTreeUri(this, Uri.parse(savedUri))
+            renderDirectory()
         }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 999 && resultCode == Activity.RESULT_OK) {
+        if (requestCode == REQUEST_CODE_OPEN_DIRECTORY && resultCode == Activity.RESULT_OK) {
             data?.data?.let { uri ->
-                contentResolver.takePersistableUriPermission(uri, 
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                getSharedPreferences("Z_DATA", MODE_PRIVATE).edit().putString("root", uri.toString()).apply()
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+                getSharedPreferences("Z_PRO_PREFS", MODE_PRIVATE)
+                    .edit().putString(PREF_KEY, uri.toString()).apply()
+                
                 currentDir = DocumentFile.fromTreeUri(this, uri)
-                renderFiles()
+                renderDirectory()
             }
         }
     }
 
+    /**
+     * Fungsi utama untuk menampilkan list file & folder
+     */
+    fun renderDirectory() {
+        val dir = currentDir ?: return
+
+        // Update Path Bar di bagian atas
+        tvPath.text = dir.uri.path?.substringAfterLast(":") ?: "Internal Storage"
+
+        // Sorting: Folder di atas, baru File (A-Z)
+        val filesList = dir.listFiles().sortedWith(
+            compareByDescending<DocumentFile> { it.isDirectory }
+                .thenBy { it.name?.lowercase() }
+        )
+
+        // Set Adapter dengan callback klik
+        rvFiles.adapter = FileAdapter(filesList) { selected ->
+            if (selected.isDirectory) {
+                // SEBELUM MASUK FOLDER: Simpan folder saat ini ke history
+                folderHistory.push(currentDir)
+                
+                currentDir = selected
+                renderDirectory()
+            } else {
+                // Munculkan Overlay Bawah (ActionHelper)
+                ActionHelper.showZMenu(this, selected) { action ->
+                    handleAction(action, selected)
+                }
+            }
+        }
+    }
+
+    private fun handleAction(action: String, file: DocumentFile) {
+        when (action) {
+            "DELETE" -> {
+                file.delete()
+                renderDirectory()
+                Toast.makeText(this, "File dihapus", Toast.LENGTH_SHORT).show()
+            }
+            "EXTRACT" -> Toast.makeText(this, "Ekstrak ${file.name}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * LOGIKA PREVIOUS FOLDER: 
+     * Saat tombol back ditekan, cek apakah ada history folder.
+     */
     override fun onBackPressed() {
-        if (backStack.isNotEmpty()) {
-            currentDir = backStack.pop()
-            renderFiles()
+        if (folderHistory.isNotEmpty()) {
+            // Ambil folder terakhir dari stack
+            currentDir = folderHistory.pop()
+            renderDirectory()
         } else {
+            // Jika sudah di root, baru keluar aplikasi
             super.onBackPressed()
         }
     }
