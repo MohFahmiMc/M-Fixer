@@ -30,22 +30,24 @@ class MainActivity : AppCompatActivity() {
     private lateinit var toolbar: Toolbar
     private var currentDir: DocumentFile? = null
     private val folderStack = Stack<DocumentFile>()
+    
+    // NAMA VARIABEL HARUS SAMA (FIX UNRESOLVED REFERENCE)
     private val REQ_STORAGE = 101 
     private val REQ_UPLOAD = 102  
 
-    // Variabel untuk mengontrol kapan Splash Screen berhenti
+    // Variabel untuk mengontrol Splash Screen
     private var isReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 1. Inisialisasi Splash Screen (Wajib paling atas)
+        // 1. Inisialisasi Splash Screen (TREND 2026)
         val splashScreen = installSplashScreen()
         
         super.onCreate(savedInstanceState)
         
-        // 2. Logika agar Splash Screen berhenti (Fix Nyangkut/Crash)
+        // 2. Fix Splash Screen Nyangkut
         splashScreen.setKeepOnScreenCondition { !isReady }
         
-        // Atur agar loading hilang setelah 2 detik (Biar estetik)
+        // Loading selama 2 detik baru masuk ke App
         Handler(Looper.getMainLooper()).postDelayed({
             isReady = true
         }, 2000)
@@ -108,9 +110,10 @@ class MainActivity : AppCompatActivity() {
         resources.updateConfiguration(config, resources.displayMetrics)
     }
 
-    // --- MENU TITIK 3 (Fix Warna) ---
+    // --- MENU TITIK 3 ---
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+        // Pastikan titik 3 putih terang
         toolbar.overflowIcon?.setTint(Color.WHITE)
         return true
     }
@@ -149,11 +152,11 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    // --- ON ACTIVITY RESULT ---
+    // --- ON ACTIVITY RESULT (FIX ERROR VARIABEL) ---
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         
-        if (requestCode == RE_STORAGE && resultCode == Activity.RESULT_OK) {
+        if (requestCode == REQ_STORAGE && resultCode == Activity.RESULT_OK) {
             data?.data?.let { uri ->
                 contentResolver.takePersistableUriPermission(uri, 
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
@@ -163,7 +166,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        if (requestCode == RE_UPLOAD && resultCode == Activity.RESULT_OK) {
+        if (requestCode == REQ_UPLOAD && resultCode == Activity.RESULT_OK) {
             data?.data?.let { sourceUri ->
                 handleFileUpload(sourceUri)
             }
@@ -213,7 +216,7 @@ class MainActivity : AppCompatActivity() {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_permission, null)
         val dialog = AlertDialog.Builder(this).setView(view).setCancelable(false).create()
         view.findViewById<Button>(R.id.btnContinue).setOnClickListener {
-            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), RE_STORAGE)
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), REQ_STORAGE)
             dialog.dismiss()
         }
         dialog.show()
