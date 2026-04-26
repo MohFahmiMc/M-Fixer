@@ -15,12 +15,8 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
     private lateinit var rvFiles: RecyclerView
     private lateinit var tvPath: TextView
-    private lateinit var loading: FrameLayout
-    private lateinit var btnBack: ImageButton
-    
     private var currentDir: DocumentFile? = null
     private val dirStack = Stack<DocumentFile>()
-    private val PREFS = "MFIXER_FINAL"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,22 +24,21 @@ class MainActivity : AppCompatActivity() {
 
         rvFiles = findViewById(R.id.rvFiles)
         tvPath = findViewById(R.id.tvPath)
-        loading = findViewById(R.id.loadingLayout)
-        btnBack = findViewById(R.id.btnBack)
         rvFiles.layoutManager = LinearLayoutManager(this)
 
         findViewById<ImageButton>(R.id.btnExit).setOnClickListener { finishAffinity() }
-        btnBack.setOnClickListener { navigateBack() }
+        findViewById<View>(R.id.fabAdd).setOnClickListener { showAddDialog() }
 
-        initApp()
+        askPermission()
     }
 
-    private fun initApp() {
-        val uriStr = getSharedPreferences(PREFS, MODE_PRIVATE).getString("uri", null)
-        if (uriStr == null) {
+    private fun askPermission() {
+        val sp = getSharedPreferences("MFIXER", MODE_PRIVATE)
+        val uri = sp.getString("uri", null)
+        if (uri == null) {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), 100)
         } else {
-            currentDir = DocumentFile.fromTreeUri(this, Uri.parse(uriStr))
+            currentDir = DocumentFile.fromTreeUri(this, Uri.parse(uri))
             loadFiles(currentDir!!)
         }
     }
@@ -53,7 +48,7 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == 100 && resultCode == RESULT_OK) {
             data?.data?.let { uri ->
                 contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("uri", uri.toString()).apply()
+                getSharedPreferences("MFIXER", MODE_PRIVATE).edit().putString("uri", uri.toString()).apply()
                 currentDir = DocumentFile.fromTreeUri(this, uri)
                 loadFiles(currentDir!!)
             }
@@ -61,44 +56,85 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadFiles(dir: DocumentFile) {
-        loading.visibility = View.VISIBLE
-        tvPath.text = dir.name
-        btnBack.visibility = if (dirStack.isEmpty()) View.GONE else View.VISIBLE
-        
+        tvPath.text = dir.uri.path
         val files = dir.listFiles().sortedByDescending { it.isDirectory }
-        rvFiles.adapter = FileAdapter(files) { f ->
+        rvFiles.adapter = FileAdapter(files, { f ->
             if (f.isDirectory) {
                 dirStack.push(currentDir)
                 currentDir = f
                 loadFiles(f)
-            } else {
-                Toast.makeText(this, "Opening Editor...", Toast.LENGTH_SHORT).show()
-            }
-        }
-        loading.visibility = View.GONE
+            } else { handleFileClick(f) }
+        }, { f -> showFileMenu(f) })
     }
 
-    private fun navigateBack() {
+    private fun showAddDialog() {
+        val options = arrayOf("New Folder", "New File (.txt)")
+        AlertDialog.Builder(this).setItems(options) { _, i ->
+            val input = EditText(this)
+            AlertDialog.Builder(this).setTitle("Name").setView(input).setPositiveButton("Create") { _, _ ->
+                val name = input.text.toString()
+                if (i == 0) currentDir?.createDirectory(name) else currentDir?.createFile("text/plain", name)
+                loadFiles(currentDir!!)
+            }.show()
+        }.show()
+    }
+
+    private fun showFileMenu(f: DocumentFile) {
+        val menu = arrayOf("Rename", "Delete", "Copy Path")
+        AlertDialog.Builder(this).setTitle(f.name).setItems(menu) { _, i ->
+            when(i) {
+                0 -> {
+                    val input = EditText(this).apply { setText(f.name) }
+                    AlertDialog.Builder(this).setView(input).setPositiveButton("OK") { _, _ ->
+                        f.renameTo(input.text.toString())
+                        loadFiles(currentDir!!)
+                    }.show()
+                }
+                1 -> { f.delete(); loadFiles(currentDir!!) }
+            }
+        }.show()
+    }
+
+    private fun handleFileClick(f: DocumentFile) {
+        val ext = f.name?.lowercase() ?: ""
+        if (ext.endsWith(".txt") || ext.endsWith(".json") || ext.endsWith(".js") || ext.endsWith(".py")) {
+            openEditor(f)
+        } else {
+            Toast.makeText(this, "File: ${f.name}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openEditor(f: DocumentFile) {
+        val et = EditText(this).apply { 
+            val content = contentResolver.openInputStream(f.uri)?.bufferedReader()?.use { it.readText() }
+            setText(content)
+            gravity = Gravity.TOP
+        }
+        AlertDialog.Builder(this).setTitle("Edit: ${f.name}").setView(et)
+            .setPositiveButton("Save") { _, _ ->
+                contentResolver.openOutputStream(f.uri, "wt")?.use { it.write(et.text.toString().toByteArray()) }
+                Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    override fun onBackPressed() {
         if (dirStack.isNotEmpty()) {
             currentDir = dirStack.pop()
             loadFiles(currentDir!!)
-        }
+        } else super.onBackPressed()
     }
+}
 
-    class FileAdapter(val list: List<DocumentFile>, val onClick: (DocumentFile) -> Unit) : RecyclerView.Adapter<FileAdapter.VH>() {
-        class VH(v: View) : RecyclerView.ViewHolder(v) {
-            val name: TextView = v.findViewById(android.R.id.text1)
-        }
-        override fun onCreateViewHolder(p: ViewGroup, t: Int) = VH(LayoutInflater.from(p.context).inflate(android.R.layout.simple_list_item_1, p, false))
-        override fun getItemCount() = list.size
-        override fun onBindViewHolder(h: VH, p: Int) {
-            val f = list[p]
-            h.name.text = f.name
-            h.name.setTextColor(0xFFFFFFFF.toInt())
-            // Pengganti Emoji ke Icon Sistem
-            val icon = if (f.isDirectory) "📁 " else "📄 "
-            h.name.text = icon + f.name
-            h.itemView.setOnClickListener { onClick(f) }
-        }
+class FileAdapter(val list: List<DocumentFile>, val onClick: (DocumentFile) -> Unit, val onLongClick: (DocumentFile) -> Unit) : RecyclerView.Adapter<FileAdapter.VH>() {
+    class VH(v: View) : RecyclerView.ViewHolder(v) { val t: TextView = v.findViewById(android.R.id.text1) }
+    override fun onCreateViewHolder(p: ViewGroup, t: Int) = VH(LayoutInflater.from(p.context).inflate(android.R.layout.simple_list_item_1, p, false))
+    override fun getItemCount() = list.size
+    override fun onBindViewHolder(h: VH, p: Int) {
+        val f = list[p]
+        val icon = if (f.isDirectory) "📁 " else if (f.name?.contains(".") == true) "📄 " else "❓ "
+        h.t.text = icon + f.name
+        h.t.setTextColor(0xFFFFFFFF.toInt())
+        h.itemView.setOnClickListener { onClick(f) }
+        h.itemView.setOnLongClickListener { onLongClick(f); true }
     }
 }
