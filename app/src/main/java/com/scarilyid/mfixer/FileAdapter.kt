@@ -10,48 +10,41 @@ import java.util.*
 
 class FileAdapter(
     private val files: List<DocumentFile>,
-    private val onFileClick: (DocumentFile) -> Unit
-) : RecyclerView.Adapter<FileAdapter.FileViewHolder>() {
+    private val onClick: (DocumentFile) -> Unit
+) : RecyclerView.Adapter<FileAdapter.VH>() {
 
-    class FileViewHolder(v: View) : RecyclerView.ViewHolder(v) {
+    class VH(v: View) : RecyclerView.ViewHolder(v) {
         val name: TextView = v.findViewById(R.id.tvFileName)
         val info: TextView = v.findViewById(R.id.tvDetails)
         val date: TextView = v.findViewById(R.id.tvDate)
         val icon: ImageView = v.findViewById(R.id.imgIcon)
     }
 
-    override fun onCreateViewHolder(p: ViewGroup, t: Int): FileViewHolder {
-        val v = LayoutInflater.from(p.context).inflate(R.layout.item_file, p, false)
-        return FileViewHolder(v)
-    }
+    override fun onCreateViewHolder(p: ViewGroup, t: Int) = VH(
+        LayoutInflater.from(p.context).inflate(R.layout.item_file, p, false)
+    )
 
-    override fun onBindViewHolder(h: FileViewHolder, p: Int) {
+    override fun onBindViewHolder(h: VH, p: Int) {
         val f = files[p]
         h.name.text = f.name
-        
         val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
         h.date.text = sdf.format(Date(f.lastModified()))
 
-        // Logika Ikon Sistem (Tanpa Emoji)
         if (f.isDirectory) {
             h.icon.setImageResource(R.drawable.ic_folder_orange)
             h.info.text = "${f.listFiles().size} items"
         } else {
             val ext = f.name?.substringAfterLast(".", "")?.lowercase()
-            if (ext == "zip" || ext == "7z") {
-                h.icon.setImageResource(R.drawable.ic_zip_orange)
-            } else {
-                h.icon.setImageResource(R.drawable.ic_file_white)
-            }
+            h.icon.setImageResource(if (ext == "zip" || ext == "7z") R.drawable.ic_zip_orange else R.drawable.ic_file_white)
             h.info.text = "${f.length() / 1024} KB"
         }
 
-        // --- ANIMASI MODERN (Slide In Left) ---
-        val animation = AnimationUtils.loadAnimation(h.itemView.context, android.R.anim.slide_in_left)
-        animation.startOffset = (p * 25).toLong()
-        h.itemView.startAnimation(animation)
+        // Animasi CSS-Style agar tidak kaku
+        val anim = AnimationUtils.loadAnimation(h.itemView.context, android.R.anim.slide_in_left)
+        anim.startOffset = (p * 30).toLong()
+        h.itemView.startAnimation(anim)
 
-        h.itemView.setOnClickListener { onFileClick(f) }
+        h.itemView.setOnClickListener { onClick(f) }
     }
 
     override fun getItemCount() = files.size
