@@ -12,15 +12,20 @@ object ActionHelper {
         val dialog = BottomSheetDialog(context)
         val view = LayoutInflater.from(context).inflate(R.layout.dialog_file_actions, null)
         
-        view.findViewById<TextView>(R.id.tvFileNameHeader).text = file.name
+        // Memperbaiki ID agar sesuai dengan XML di atas
+        val header = view.findViewById<TextView>(R.id.tvFileNameHeader)
+        val btnView = view.findViewById<LinearLayout>(R.id.btnView)
+        val btnDelete = view.findViewById<LinearLayout>(R.id.btnDelete)
 
-        view.findViewById<LinearLayout>(R.id.btnDelete).setOnClickListener { 
-            onAction("DELETE")
+        header.text = file.name
+
+        btnView.setOnClickListener { 
+            onAction("VIEW")
             dialog.dismiss() 
         }
-        
-        view.findViewById<LinearLayout>(R.id.btnView).setOnClickListener { 
-            onAction("VIEW")
+
+        btnDelete.setOnClickListener { 
+            onAction("DELETE")
             dialog.dismiss() 
         }
 
