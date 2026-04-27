@@ -16,7 +16,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.documentfile.provider.DocumentFile
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -31,28 +30,16 @@ class MainActivity : AppCompatActivity() {
     private var currentDir: DocumentFile? = null
     private val folderStack = Stack<DocumentFile>()
     
-    // NAMA VARIABEL HARUS SAMA (FIX UNRESOLVED REFERENCE)
+    // NAMA VARIABEL TETAP REQ (Sesuai Manifest & Activity Result)
     private val REQ_STORAGE = 101 
     private val REQ_UPLOAD = 102  
 
-    // Variabel untuk mengontrol Splash Screen
-    private var isReady = false
-
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 1. Inisialisasi Splash Screen (TREND 2026)
-        val splashScreen = installSplashScreen()
+        // --- PENTING: installSplashScreen() DIHAPUS karena pakai SplashActivity manual ---
         
         super.onCreate(savedInstanceState)
         
-        // 2. Fix Splash Screen Nyangkut
-        splashScreen.setKeepOnScreenCondition { !isReady }
-        
-        // Loading selama 2 detik baru masuk ke App
-        Handler(Looper.getMainLooper()).postDelayed({
-            isReady = true
-        }, 2000)
-
-        // 3. Load Bahasa
+        // 1. Load Bahasa
         loadLocale()
         
         setContentView(R.layout.activity_main)
@@ -74,6 +61,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Jalankan pengecekan folder
         checkFirstRun()
     }
 
@@ -110,10 +98,10 @@ class MainActivity : AppCompatActivity() {
         resources.updateConfiguration(config, resources.displayMetrics)
     }
 
-    // --- MENU TITIK 3 ---
+    // --- MENU TITIK 3 (Fix Warna) ---
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
-        // Pastikan titik 3 putih terang
+        // Ikon titik 3 jadi putih
         toolbar.overflowIcon?.setTint(Color.WHITE)
         return true
     }
@@ -152,7 +140,7 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    // --- ON ACTIVITY RESULT (FIX ERROR VARIABEL) ---
+    // --- ON ACTIVITY RESULT (Izin Folder & Upload) ---
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         
@@ -175,7 +163,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleFileUpload(sourceUri: Uri) {
         val destDir = currentDir ?: return
-        LoadingHelper.show(this)
+        LoadingHelper.show(this, "Uploading file...")
 
         try {
             val fileName = getFileName(sourceUri) ?: "new_file"
@@ -187,10 +175,10 @@ class MainActivity : AppCompatActivity() {
                         input.copyTo(output)
                     }
                 }
-                Toast.makeText(this, "Success: $fileName uploaded", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Success: $fileName", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Toast.makeText(this, "Upload Error: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
         } finally {
             LoadingHelper.dismiss()
             refreshList()
