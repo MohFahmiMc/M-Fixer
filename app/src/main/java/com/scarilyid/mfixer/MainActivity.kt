@@ -13,6 +13,7 @@ import android.view.MenuItem
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
@@ -37,7 +38,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Setup UI
+        // 1. Setup UI Components
         toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.title = "M-Fixer"
@@ -50,6 +51,19 @@ class MainActivity : AppCompatActivity() {
             AddActionHelper.showAddMenu(this, currentDir) { refreshList() }
         }
 
+        // 2. Setup Back Button Logic (Android 13+ friendly)
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (folderStack.isNotEmpty()) {
+                    currentDir = folderStack.pop()
+                    refreshList()
+                } else {
+                    finish()
+                }
+            }
+        })
+
+        // 3. Jalankan pengecekan folder pertama kali
         checkFirstRun()
     }
 
@@ -62,7 +76,11 @@ class MainActivity : AppCompatActivity() {
         } else {
             try {
                 currentDir = DocumentFile.fromTreeUri(this, Uri.parse(uriStr))
-                refreshList()
+                if (currentDir != null && currentDir!!.exists()) {
+                    refreshList()
+                } else {
+                    showPermissionPopup()
+                }
             } catch (e: Exception) {
                 showPermissionPopup()
             }
@@ -76,9 +94,13 @@ class MainActivity : AppCompatActivity() {
         when (requestCode) {
             REQ_STORAGE -> {
                 data?.data?.let { uri ->
+                    // Simpan izin akses folder secara permanen
                     contentResolver.takePersistableUriPermission(uri, 
                         Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                    getSharedPreferences("MFIXER_PREFS", MODE_PRIVATE).edit().putString("root_uri", uri.toString()).apply()
+                    
+                    getSharedPreferences("MFIXER_PREFS", MODE_PRIVATE).edit()
+                        .putString("root_uri", uri.toString()).apply()
+                    
                     currentDir = DocumentFile.fromTreeUri(this, uri)
                     refreshList()
                 }
@@ -95,9 +117,14 @@ class MainActivity : AppCompatActivity() {
 
         Thread {
             try {
+                // Menggunakan FileManager.kt yang dipisah
                 val name = FileManager.copyFile(this, sourceUri, destDir)
                 runOnUiThread { 
-                    if (name != null) Toast.makeText(this, "Success: $name", Toast.LENGTH_SHORT).show()
+                    if (name != null) {
+                        Toast.makeText(this, "Success: $name", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "Failed to copy file", Toast.LENGTH_SHORT).show()
+                    }
                 }
             } catch (e: Exception) {
                 runOnUiThread { Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show() }
@@ -113,23 +140,34 @@ class MainActivity : AppCompatActivity() {
     fun refreshList() {
         val dir = currentDir ?: return
         LoadingHelper.show(this)
+        
+        // Tampilkan path folder saat ini
         tvPath.text = dir.uri.path?.substringAfterLast(":") ?: "Root"
 
         Handler(Looper.getMainLooper()).postDelayed({
-            val files = dir.listFiles().sortedWith(
-                compareByDescending<DocumentFile> { it.isDirectory }.thenBy { it.name?.lowercase() }
-            )
+            try {
+                val files = dir.listFiles().sortedWith(
+                    compareByDescending<DocumentFile> { it.isDirectory }
+                    .thenBy { it.name?.lowercase() ?: "" }
+                )
 
-            rvFiles.adapter = FileAdapter(files, folderStack.isNotEmpty()) { selected ->
-                if (selected == null) { 
-                    if (folderStack.isNotEmpty()) { currentDir = folderStack.pop(); refreshList() }
-                } else if (selected.isDirectory) {
-                    folderStack.push(currentDir)
-                    currentDir = selected
-                    refreshList()
-                } else {
-                    ActionHelper.showZMenu(this, selected) { refreshList() }
+                rvFiles.adapter = FileAdapter(files, folderStack.isNotEmpty()) { selected ->
+                    if (selected == null) { // Tombol "Back/Up" di dalam list
+                        if (folderStack.isNotEmpty()) {
+                            currentDir = folderStack.pop()
+                            refreshList()
+                        }
+                    } else if (selected.isDirectory) {
+                        folderStack.push(currentDir)
+                        currentDir = selected
+                        refreshList()
+                    } else {
+                        // Tampilkan menu aksi file (ZMenu)
+                        ActionHelper.showZMenu(this, selected) { refreshList() }
+                    }
                 }
+            } catch (e: Exception) {
+                Toast.makeText(this, "Gagal memuat folder", Toast.LENGTH_SHORT).show()
             }
             LoadingHelper.dismiss()
         }, 300) 
@@ -138,8 +176,10 @@ class MainActivity : AppCompatActivity() {
     private fun showPermissionPopup() {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_permission, null)
         val dialog = AlertDialog.Builder(this).setView(view).setCancelable(false).create()
+        
         view.findViewById<Button>(R.id.btnContinue).setOnClickListener {
-            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), REQ_STORAGE)
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+            startActivityForResult(intent, REQ_STORAGE)
             dialog.dismiss()
         }
         dialog.show()
@@ -154,15 +194,14 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == R.id.menu_about) {
             val view = LayoutInflater.from(this).inflate(R.layout.dialog_about, null)
-            AlertDialog.Builder(this).setView(view).show()
+            val dialog = AlertDialog.Builder(this).setView(view).create()
+            
+            view.findViewById<Button>(R.id.btnGithub)?.setOnClickListener {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/MohFahmiMc")))
+                dialog.dismiss()
+            }
+            dialog.show()
         }
         return super.onOptionsItemSelected(item)
-    }
-
-    override fun onBackPressed() {
-        if (folderStack.isNotEmpty()) {
-            currentDir = folderStack.pop()
-            refreshList()
-        } else super.onBackPressed()
     }
 }
