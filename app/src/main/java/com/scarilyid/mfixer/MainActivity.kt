@@ -30,18 +30,13 @@ class MainActivity : AppCompatActivity() {
     private var currentDir: DocumentFile? = null
     private val folderStack = Stack<DocumentFile>()
     
-    // NAMA VARIABEL TETAP REQ (Sesuai Manifest & Activity Result)
     private val REQ_STORAGE = 101 
     private val REQ_UPLOAD = 102  
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // --- PENTING: installSplashScreen() DIHAPUS karena pakai SplashActivity manual ---
-        
         super.onCreate(savedInstanceState)
         
-        // 1. Load Bahasa
-        loadLocale()
-        
+        // 1. Langsung set layout tanpa loadLocale (menghindari crash restart)
         setContentView(R.layout.activity_main)
 
         // --- SETUP TOOLBAR ---
@@ -49,6 +44,7 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
         supportActionBar?.title = "M-Fixer: Mojang directory"
 
+        // --- SETUP RECYCLERVIEW ---
         rvFiles = findViewById(R.id.rvFiles)
         tvPath = findViewById(R.id.tvPath)
         rvFiles.layoutManager = LinearLayoutManager(this)
@@ -61,71 +57,42 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Jalankan pengecekan folder
+        // 2. Cek folder root Mojang
         checkFirstRun()
     }
 
-    // --- LOGIKA BAHASA & FIRST RUN ---
     private fun checkFirstRun() {
         val sp = getSharedPreferences("MFIXER_PREFS", MODE_PRIVATE)
-        val isFirstTime = sp.getBoolean("is_first_time", true)
-        
-        if (isFirstTime) {
-            sp.edit().putString("lang", "en").putBoolean("is_first_time", false).apply()
-            setAppLocale("en")
-        }
-
         val uriStr = sp.getString("root_uri", null)
+        
         if (uriStr == null) {
             showPermissionPopup()
         } else {
-            currentDir = DocumentFile.fromTreeUri(this, Uri.parse(uriStr))
-            refreshList()
+            try {
+                currentDir = DocumentFile.fromTreeUri(this, Uri.parse(uriStr))
+                refreshList()
+            } catch (e: Exception) {
+                showPermissionPopup() // Jika URI rusak, minta izin ulang
+            }
         }
     }
 
-    private fun loadLocale() {
-        val sp = getSharedPreferences("MFIXER_PREFS", MODE_PRIVATE)
-        val lang = sp.getString("lang", "en") ?: "en"
-        setAppLocale(lang)
-    }
-
-    private fun setAppLocale(langCode: String) {
-        val locale = Locale(langCode)
-        Locale.setDefault(locale)
-        val config = resources.configuration
-        config.setLocale(locale)
-        resources.updateConfiguration(config, resources.displayMetrics)
-    }
-
-    // --- MENU TITIK 3 (Fix Warna) ---
+    // --- MENU TITIK 3 (Hanya About) ---
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
-        // Ikon titik 3 jadi putih
+        
+        // Sembunyikan item bahasa jika masih ada di main_menu.xml
+        menu?.findItem(R.id.menu_language)?.isVisible = false
+        
         toolbar.overflowIcon?.setTint(Color.WHITE)
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        when (item.itemId) {
-            R.id.menu_language -> showLanguageDialog()
-            R.id.menu_about -> showAboutDialog()
+        if (item.itemId == R.id.menu_about) {
+            showAboutDialog()
         }
         return super.onOptionsItemSelected(item)
-    }
-
-    private fun showLanguageDialog() {
-        val languages = arrayOf("English", "Indonesia", "Basa Jawa", "Basa Sunda", "日本語 (Japan)")
-        val codes = arrayOf("en", "id", "jv", "su", "ja")
-
-        AlertDialog.Builder(this)
-            .setTitle("Select Language")
-            .setItems(languages) { _, which ->
-                getSharedPreferences("MFIXER_PREFS", MODE_PRIVATE).edit()
-                    .putString("lang", codes[which]).apply()
-                setAppLocale(codes[which])
-                recreate() 
-            }.show()
     }
 
     private fun showAboutDialog() {
@@ -140,7 +107,7 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    // --- ON ACTIVITY RESULT (Izin Folder & Upload) ---
+    // --- MANAJEMEN FILE & UPLOAD ---
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         
@@ -165,41 +132,43 @@ class MainActivity : AppCompatActivity() {
         val destDir = currentDir ?: return
         LoadingHelper.show(this, "Uploading file...")
 
-        try {
-            val fileName = getFileName(sourceUri) ?: "new_file"
-            val newFile = destDir.createFile("*/*", fileName)
-            
-            if (newFile != null) {
-                contentResolver.openInputStream(sourceUri)?.use { input ->
-                    contentResolver.openOutputStream(newFile.uri)?.use { output ->
-                        input.copyTo(output)
+        Thread {
+            try {
+                val fileName = getFileName(sourceUri) ?: "new_file"
+                val newFile = destDir.createFile("*/*", fileName)
+                
+                if (newFile != null) {
+                    contentResolver.openInputStream(sourceUri)?.use { input ->
+                        contentResolver.openOutputStream(newFile.uri)?.use { output ->
+                            input.copyTo(output)
+                        }
                     }
+                    runOnUiThread { Toast.makeText(this, "Berhasil: $fileName", Toast.LENGTH_SHORT).show() }
                 }
-                Toast.makeText(this, "Success: $fileName", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                runOnUiThread { Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show() }
+            } finally {
+                runOnUiThread {
+                    LoadingHelper.dismiss()
+                    refreshList()
+                }
             }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-        } finally {
-            LoadingHelper.dismiss()
-            refreshList()
-        }
+        }.start()
     }
 
     private fun getFileName(uri: Uri): String? {
         var result: String? = null
         if (uri.scheme == "content") {
-            val cursor = contentResolver.query(uri, null, null, null, null)
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    val index = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    if (index != -1) result = it.getString(index)
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (index != -1) result = cursor.getString(index)
                 }
             }
         }
         return result ?: uri.path?.substringAfterLast('/')
     }
 
-    // --- SISTEM LIST & NAVIGATION ---
     private fun showPermissionPopup() {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_permission, null)
         val dialog = AlertDialog.Builder(this).setView(view).setCancelable(false).create()
@@ -214,7 +183,7 @@ class MainActivity : AppCompatActivity() {
         val dir = currentDir ?: return
         LoadingHelper.show(this)
 
-        tvPath.text = dir.uri.path?.substringAfterLast(":") ?: "Memory"
+        tvPath.text = dir.uri.path?.substringAfterLast(":") ?: "Root"
 
         Handler(Looper.getMainLooper()).postDelayed({
             val files = dir.listFiles().sortedWith(
@@ -224,8 +193,10 @@ class MainActivity : AppCompatActivity() {
 
             rvFiles.adapter = FileAdapter(files, folderStack.isNotEmpty()) { selected ->
                 if (selected == null) { 
-                    currentDir = folderStack.pop()
-                    refreshList()
+                    if (folderStack.isNotEmpty()) {
+                        currentDir = folderStack.pop()
+                        refreshList()
+                    }
                 } else if (selected.isDirectory) {
                     folderStack.push(currentDir)
                     currentDir = selected
@@ -242,6 +213,8 @@ class MainActivity : AppCompatActivity() {
         if (folderStack.isNotEmpty()) {
             currentDir = folderStack.pop()
             refreshList()
-        } else super.onBackPressed()
+        } else {
+            super.onBackPressed()
+        }
     }
 }
