@@ -36,22 +36,25 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Pastikan layout ini sudah benar ID-ID nya
         setContentView(R.layout.activity_main)
 
-        // 1. Setup UI Components
+        // 1. Setup Toolbar
         toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.title = "M-Fixer"
 
+        // 2. Setup View
         rvFiles = findViewById(R.id.rvFiles)
         tvPath = findViewById(R.id.tvPath)
         rvFiles.layoutManager = LinearLayoutManager(this)
 
+        // 3. Tombol Tambah (+)
         findViewById<FloatingActionButton>(R.id.fabAdd).setOnClickListener {
             AddActionHelper.showAddMenu(this, currentDir) { refreshList() }
         }
 
-        // 2. Setup Back Button Logic (Android 13+ friendly)
+        // 4. Logika Tombol Back (Navigasi Folder)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (folderStack.isNotEmpty()) {
@@ -63,7 +66,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        // 3. Jalankan pengecekan folder pertama kali
+        // 5. Cek akses folder saat aplikasi dibuka
         checkFirstRun()
     }
 
@@ -75,7 +78,9 @@ class MainActivity : AppCompatActivity() {
             showPermissionPopup()
         } else {
             try {
-                currentDir = DocumentFile.fromTreeUri(this, Uri.parse(uriStr))
+                val rootUri = Uri.parse(uriStr)
+                currentDir = DocumentFile.fromTreeUri(this, rootUri)
+                
                 if (currentDir != null && currentDir!!.exists()) {
                     refreshList()
                 } else {
@@ -94,7 +99,7 @@ class MainActivity : AppCompatActivity() {
         when (requestCode) {
             REQ_STORAGE -> {
                 data?.data?.let { uri ->
-                    // Simpan izin akses folder secara permanen
+                    // KUNCI: Simpan izin akses selamanya (biar nggak minta terus)
                     contentResolver.takePersistableUriPermission(uri, 
                         Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                     
@@ -117,13 +122,11 @@ class MainActivity : AppCompatActivity() {
 
         Thread {
             try {
-                // Menggunakan FileManager.kt yang dipisah
+                // Mengandalkan FileManager.kt yang kita buat sebelumnya
                 val name = FileManager.copyFile(this, sourceUri, destDir)
                 runOnUiThread { 
                     if (name != null) {
-                        Toast.makeText(this, "Success: $name", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this, "Failed to copy file", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Berhasil: $name", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
@@ -141,7 +144,7 @@ class MainActivity : AppCompatActivity() {
         val dir = currentDir ?: return
         LoadingHelper.show(this)
         
-        // Tampilkan path folder saat ini
+        // Tampilkan lokasi folder saat ini di UI
         tvPath.text = dir.uri.path?.substringAfterLast(":") ?: "Root"
 
         Handler(Looper.getMainLooper()).postDelayed({
@@ -152,7 +155,7 @@ class MainActivity : AppCompatActivity() {
                 )
 
                 rvFiles.adapter = FileAdapter(files, folderStack.isNotEmpty()) { selected ->
-                    if (selected == null) { // Tombol "Back/Up" di dalam list
+                    if (selected == null) { // User klik tombol ".." (Back) di list
                         if (folderStack.isNotEmpty()) {
                             currentDir = folderStack.pop()
                             refreshList()
@@ -162,12 +165,12 @@ class MainActivity : AppCompatActivity() {
                         currentDir = selected
                         refreshList()
                     } else {
-                        // Tampilkan menu aksi file (ZMenu)
+                        // Jalankan menu aksi (Fix/Extract/Delete dll)
                         ActionHelper.showZMenu(this, selected) { refreshList() }
                     }
                 }
             } catch (e: Exception) {
-                Toast.makeText(this, "Gagal memuat folder", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Gagal memuat file", Toast.LENGTH_SHORT).show()
             }
             LoadingHelper.dismiss()
         }, 300) 
@@ -178,8 +181,23 @@ class MainActivity : AppCompatActivity() {
         val dialog = AlertDialog.Builder(this).setView(view).setCancelable(false).create()
         
         view.findViewById<Button>(R.id.btnContinue).setOnClickListener {
-            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
-            startActivityForResult(intent, REQ_STORAGE)
+            // Path sakti menuju Minecraft
+            val path = "Android%2Fdata%2Fcom.mojang.minecraftpe%2Ffiles%2Fgames%2Fcom.mojang"
+            val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary%3A$path")
+
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                putExtra("android.provider.extra.INITIAL_URI", uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or 
+                         Intent.FLAG_GRANT_WRITE_URI_PERMISSION or 
+                         Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            }
+            
+            try {
+                startActivityForResult(intent, REQ_STORAGE)
+            } catch (e: Exception) {
+                // Fallback kalau INITIAL_URI gagal
+                startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), REQ_STORAGE)
+            }
             dialog.dismiss()
         }
         dialog.show()
@@ -195,7 +213,6 @@ class MainActivity : AppCompatActivity() {
         if (item.itemId == R.id.menu_about) {
             val view = LayoutInflater.from(this).inflate(R.layout.dialog_about, null)
             val dialog = AlertDialog.Builder(this).setView(view).create()
-            
             view.findViewById<Button>(R.id.btnGithub)?.setOnClickListener {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/MohFahmiMc")))
                 dialog.dismiss()
